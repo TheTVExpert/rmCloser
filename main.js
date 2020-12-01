@@ -1,0 +1,192 @@
+//rmCloser
+//<nowiki>
+var rmCloser = {};
+window.rmCloser = rmCloser;
+
+$.when(
+	mw.loader.using([ 'mediawiki.api', 'ext.gadget.morebits' ]),
+	$.ready
+).then(function() {
+	if (document.getElementById("reqmovetag") !== null) {
+		document.getElementById("reqmovetag").innerHTML = "<button id='rmCloserClose'>Close</button><button id='rmCloserRelist'>Relist</button>";
+		$('#rmCloserClose').click(rmCloser.callback);
+		$('#rmCloserRelist').click(rmCloser.relist);
+	}
+});
+
+rmCloser.advert = ' using [[User:TheTVExpert/rmCloser|rmCloser]]';
+
+rmCloser.callback = function rmCloserCallback(e) {
+	if (e) e.preventDefault();
+
+	var Window = new Morebits.simpleWindow(600, 450);
+	Window.setTitle( "Close requested move" );
+	Window.setScriptName('rmCloser');
+	Window.addFooterLink('RM Closing instruction', 'WP:RMCI');
+	Window.addFooterLink('Script documentation', 'User:TheTVExpert/rmCloser');
+
+	var form = new Morebits.quickForm(rmCloser.evaluate);
+	
+	form.append({
+		type: 'div',
+		label: 'Result'
+	});
+
+	form.append({
+		type: 'radio',
+		name: 'result',
+		list: [
+			{
+				label: 'Moved',
+				value: 'moved',
+				event: function() {
+					document.getElementsByName('customResult')[0].style.display = 'none';
+				}
+			},
+			{
+				label: 'Not moved',
+				value: 'not moved',
+				event: function() {
+					document.getElementsByName('customResult')[0].style.display = 'none';
+				}
+			},
+			{
+				label: 'No consensus',
+				value: 'no consensus',
+				event: function() {
+					document.getElementsByName('customResult')[0].style.display = 'none';
+				}
+			},
+			{
+				label: 'Custom',
+				value: 'custom',
+				event: function() {
+					document.getElementsByName('customResult')[0].style.display = 'inline';
+				}
+			}
+		]
+	});
+	
+	form.append({
+		type: 'input',
+		name: 'customResult',
+	});
+
+	form.append({ type: 'submit', label: 'Submit' });
+
+	var formResult = form.render();
+	Window.setContent(formResult);
+	Window.display();
+	
+	document.getElementsByName('customResult')[0].style.display = 'none';
+};
+
+rmCloser.evaluate = function(e) {
+	var form = e.target;
+	rmCloser.params = Morebits.quickForm.getInputData(form);
+
+	Morebits.simpleWindow.setButtonsEnabled(false);
+	Morebits.status.init(form);
+
+	var title_obj = mw.Title.newFromText(Morebits.pageNameNorm);
+	rmCloser.title = title_obj.getSubjectPage().toText();
+	rmCloser.talktitle = title_obj.getTalkPage().toText();
+	
+	var result = rmCloser.params.result;
+	if(result == 'custom'){
+		result = rmCloser.params.customResult;
+	}
+
+	var talkpage = new Morebits.wiki.page(rmCloser.talktitle, 'Closing move.');
+	talkpage.load(function(talkpage) {
+		var text = talkpage.getPageText();
+		var template = text.match(/{{[Rr]equested move\/dated\|.*\n?.*}}/)[0];
+
+		var userGroupText = "";
+		if(Morebits.userIsInGroup('sysop')){
+			userGroupText = "";
+		} else if(Morebits.userIsInGroup('extendedmover')){
+			userGroupText = "|pmc=y";
+		} else{
+			userGroupText = "|nac=y";
+		}
+		text = text.replace(/{{[Rr]equested move\/dated\|.*\n?.*}}/, "{{subst:RM top|'''" + result + ".'''"+ userGroupText +"}}");
+		
+		var sections = text.match(/^(==)[^=].+\1/gm);
+		var sectionToFind = /== Requested move.*==/;
+		sections.reverse();
+		var moveSection;
+		if(sectionToFind.test(sections[0])){
+			text+='\n{{subst:RM bottom}}';
+			moveSection = sections[0];
+		} else{
+			var i;
+			for(i=0;i<sections.length;i++){
+				if(sectionToFind.test(sections[i])){
+					text = text.replace(sections[i-1], '\n{{subst:RM bottom}}\n' + sections[i-1]);
+					moveSection = sections[i];
+					break;
+				}
+			}
+		}
+		
+		var date = '|date=' + moveSection.slice(18,34);
+		var from = '';
+		if(result == "moved"){
+			from = '|from=' + rmCloser.title;
+		}
+		var destination = template.match(/\|new1=(.*)\|current2=/);
+		if(destination != null){
+			destination = destination[1];
+		} else{
+			destination = template.match(/\|(.*)}}/);
+			if(destination != null){
+				destination = destination[1];
+			}
+		}
+		destination = '|destination=' + destination;
+		var moveSectionPlain = moveSection.slice(3,-3);
+		var link = '|link=Special:Permalink/' + talkpage.getCurrentID() + '#' + moveSectionPlain;
+		
+		var firstSection = text.match(/==.*==/)[0];
+		text = text.replace(firstSection, '{{old move'+ date + from + destination + '|result=' + result + link +'}}\n\n' + firstSection);
+	
+		talkpage.setPageText(text);
+		talkpage.setEditSummary('Closing requested move; ' + result + rmCloser.advert);
+		talkpage.save(Morebits.status.actionCompleted('Moved closed.'));
+	});
+};
+
+rmCloser.relist = function rmCloserRelist(e) {
+	if (e) e.preventDefault();
+	var title_obj = mw.Title.newFromText(Morebits.pageNameNorm);
+	rmCloser.talktitle = title_obj.getTalkPage().toText();
+	var talkpage = new Morebits.wiki.page(rmCloser.talktitle, 'Relisting.');
+	talkpage.load(function(talkpage) {
+		var text = talkpage.getPageText();
+
+		var templateFound = false;
+		var sig;
+		var line;
+		var textToFind = text.split('\n');
+		for (var i = 0; i < textToFind.length; i++) {	
+			line = textToFind[i];
+			if(templateFound == false){
+				if(/{{[Rr]equested move\/dated/.test(line)){
+					templateFound = true;
+				}
+			} else if(templateFound == true){
+				if (/ \(UTC\)/.test(line)){
+					sig = line;
+					break;
+				}
+			}
+		}
+		text = text.replace(sig, sig + " {{subst:relisting}}");
+		
+		talkpage.setPageText(text);
+		talkpage.setEditSummary('Relisted requested move' + rmCloser.advert);
+		talkpage.save(Morebits.status.actionCompleted('Relisted.'));
+	});
+};
+//</nowiki>
