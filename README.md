@@ -1,0 +1,2 @@
+# rmCloser
+Wikipedia user script
