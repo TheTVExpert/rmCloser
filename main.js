@@ -8,11 +8,29 @@ $.when(
 	$.ready
 ).then(function() {
 	if (document.getElementById("reqmovetag") !== null) {
-		document.getElementById("reqmovetag").innerHTML = "<button id='rmCloserClose'>Close</button><button id='rmCloserRelist'>Relist</button>";
+		document.getElementById("reqmovetag").innerHTML = "<button id='rmCloserClose'>Close</button><button id='rmCloserRelist'>Relist</button><button id='rmCloserConfirm' style='display:none'>Confirm relist</button><button id='rmCloserCancel' style='display:none'>Cancel relist</button>";
 		$('#rmCloserClose').click(rmCloser.callback);
-		$('#rmCloserRelist').click(rmCloser.relist);
+		$('#rmCloserRelist').click(rmCloser.confirmRelist);
+		$('#rmCloserConfirm').click(rmCloser.relist);
+		$('#rmCloserCancel').click(rmCloser.cancelRelist);
 	}
 });
+
+rmCloser.confirmRelist = function rmCloserConfirmRelist(e) {
+	if (e) e.preventDefault();
+	document.getElementById("rmCloserConfirm").style.display = "inline";
+	document.getElementById("rmCloserCancel").style.display = "inline";
+	document.getElementById("rmCloserClose").style.display = "none";
+	document.getElementById("rmCloserRelist").style.display = "none";
+};
+
+rmCloser.cancelRelist = function rmCloserCancelRelist(e) {
+	if (e) e.preventDefault();
+	document.getElementById("rmCloserConfirm").style.display = "none";
+	document.getElementById("rmCloserCancel").style.display = "none";
+	document.getElementById("rmCloserClose").style.display = "inline";
+	document.getElementById("rmCloserRelist").style.display = "inline";
+};
 
 rmCloser.advert = ' using [[User:TheTVExpert/rmCloser|rmCloser]]';
 
