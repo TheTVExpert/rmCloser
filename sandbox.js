@@ -120,6 +120,25 @@ rmCloser.evaluate = function(e) {
 		var text = talkpage.getPageText();
 		var template = text.match(/{{[Rr]equested move\/dated\|.*\n?.*}}/)[0];
 
+		var templateFound = false;
+		var numberOfMoves = 0;
+		var line;
+		var textToFind = text.split('\n');
+		for (var i = 0; i < textToFind.length; i++) {	
+			line = textToFind[i];
+			if(templateFound == false){
+				if(/{{[Rr]equested move\/dated/.test(line)){
+					templateFound = true;
+				}
+			} else if(templateFound == true){
+				if (/ \(UTC\)/.test(line)){
+					break;
+				} else if(/→/.test(line)){
+					numberOfMoves++
+				}
+			}
+		}
+		
 		var userGroupText = "";
 		if(Morebits.userIsInGroup('sysop')){
 			userGroupText = "";
@@ -148,6 +167,8 @@ rmCloser.evaluate = function(e) {
 			}
 		}
 		
+		var multiMove = false;
+		
 		var date = '|date=' + moveSection.slice(18,34);
 		var from = '';
 		if(result == "moved"){
@@ -155,6 +176,7 @@ rmCloser.evaluate = function(e) {
 		}
 		var destination = template.match(/\|new1=(.*)\|current2=/);
 		if(destination != null){
+			multiMove = true;
 			destination = destination[1];
 		} else{
 			destination = template.match(/\|(.*)}}/);
@@ -172,6 +194,30 @@ rmCloser.evaluate = function(e) {
 		talkpage.setPageText(text);
 		talkpage.setEditSummary('Closing requested move; ' + result + rmCloser.advert);
 		talkpage.save(Morebits.status.actionCompleted('Moved closed.'));
+		
+		if(multiMove == true){
+			var otherDestinations = [];
+			var otherPages = [];
+			for(i=2; i<(numberOfMoves+1); i++){
+				var text1 = "\\|current" + i + "=(.*)\\|new" + i;
+				var reg1 = new RegExp(text1);
+				var curr = template.match(reg1);
+				if(i != numberOfMoves){
+					var nextNum = i+1;
+					var text2 = "\\|new" + i + "=(.*)\\|current" + nextNum;
+					var reg2 = new RegExp(text2);
+					var dest = template.match(reg2);
+				} else{
+					var text3 = "\\|new" + i + "=(.*)\\|}}"
+					var reg3 = new RegExp(text3);
+					var dest = template.match(reg3);
+				}
+				if(curr != null && dest != null){
+					otherPages.push(curr[1]);
+					otherDestinations.push(dest[1]);
+				}
+			}
+		}
 	});
 };
 
