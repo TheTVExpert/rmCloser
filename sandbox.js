@@ -188,8 +188,17 @@ rmCloser.evaluate = function(e) {
 		var moveSectionPlain = moveSection.slice(3,-3);
 		var link = '|link=Special:Permalink/' + talkpage.getCurrentID() + '#' + moveSectionPlain;
 		
-		var firstSection = text.match(/==.*==/)[0];
-		text = text.replace(firstSection, '{{old move'+ date + from + destination + '|result=' + result + link +'}}\n\n' + firstSection);
+		var archives = text.match(/{{[Aa]rchives/);
+		if(archives == null){
+			archives = text.match(/{{[Aa]rchive box/);
+			if(archives == null){
+				archives = text.match(/{{[Aa]rchivebox/);
+				if(archives == null){
+					archives = text.match(/==.*==/);
+				}
+			}
+		}
+		text = text.replace(archives[0], '{{old move'+ date + from + destination + '|result=' + result + link +'}}\n\n' + archives[0]);
 	
 		talkpage.setPageText(text);
 		talkpage.setEditSummary('Closing requested move; ' + result + rmCloser.advert);
@@ -234,8 +243,17 @@ rmCloser.evaluate = function(e) {
 						otherFrom = '|from=' + OMcurr;
 					}
 					var otherDestination = '|destination=' + OMdest;
-					var otherFirstSection = otherText.match(/==.*==/)[0];
-					otherText = otherText.replace(otherFirstSection, '{{old move'+ date + otherFrom + otherDestination + '|result=' + result + link +'}}\n\n' + otherFirstSection);
+					var otherArchives = otherText.match(/{{[Aa]rchives/);
+					if(otherArchives == null){
+						otherArchives = otherText.match(/{{[Aa]rchive box/);
+						if(otherArchives == null){
+							otherArchives = otherText.match(/{{[Aa]rchivebox/);
+							if(otherArchives == null){
+								otherArchives = otherText.match(/==.*==/);
+							}
+						}
+					}
+					otherText = otherText.replace(otherArchives[0], '{{old move'+ date + otherFrom + otherDestination + '|result=' + result + link +'}}\n\n' + otherArchives[0]);
 
 					otherPage.setPageText(otherText);
 					otherPage.setEditSummary('Closing requested move; ' + result + rmCloser.advert);
