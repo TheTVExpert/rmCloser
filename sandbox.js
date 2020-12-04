@@ -134,7 +134,7 @@ rmCloser.evaluate = function(e) {
 				if (/ \(UTC\)/.test(line)){
 					break;
 				} else if(/→/.test(line)){
-					numberOfMoves++
+					numberOfMoves++;
 				}
 			}
 		}
@@ -202,20 +202,45 @@ rmCloser.evaluate = function(e) {
 				var text1 = "\\|current" + i + "=(.*)\\|new" + i;
 				var reg1 = new RegExp(text1);
 				var curr = template.match(reg1);
+				var dest;
 				if(i != numberOfMoves){
 					var nextNum = i+1;
 					var text2 = "\\|new" + i + "=(.*)\\|current" + nextNum;
 					var reg2 = new RegExp(text2);
-					var dest = template.match(reg2);
+					dest = template.match(reg2);
 				} else{
-					var text3 = "\\|new" + i + "=(.*)\\|}}"
+					var text3 = "\\|new" + i + "=(.*)\\|}}";
 					var reg3 = new RegExp(text3);
-					var dest = template.match(reg3);
+					dest = template.match(reg3);
 				}
+				
 				if(curr != null && dest != null){
 					otherPages.push(curr[1]);
 					otherDestinations.push(dest[1]);
 				}
+			}
+			
+			for(var j=0; j<otherPages.length; j++){
+				var otherTitle_obj = mw.Title.newFromText(otherPages[j]);
+				rmCloser.otherTalktitle = otherTitle_obj.getTalkPage().toText();
+				var otherPage = new Morebits.wiki.page(rmCloser.otherTalktitle, 'Added {{old move}} to ' + rmCloser.otherTalktitle + '.');
+				otherPage.load(function(otherPage) {
+					var otherText = otherPage.getPageText();
+					var title = mw.Title.newFromText(otherPage.getPageName()).getSubjectPage().toText();
+					var OMcurr = otherPages[otherPages.indexOf(title)];
+					var OMdest = otherDestinations[otherPages.indexOf(title)];
+					var otherFrom = '';
+					if(result == "moved"){
+						otherFrom = '|from=' + OMcurr;
+					}
+					var otherDestination = '|destination=' + OMdest;
+					var otherFirstSection = otherText.match(/==.*==/)[0];
+					otherText = otherText.replace(otherFirstSection, '{{old move'+ date + otherFrom + otherDestination + '|result=' + result + link +'}}\n\n' + otherFirstSection);
+
+					otherPage.setPageText(otherText);
+					otherPage.setEditSummary('Closing requested move; ' + result + rmCloser.advert);
+					otherPage.save(Morebits.status.actionCompleted('Moved closed.'));
+				});
 			}
 		}
 	});
