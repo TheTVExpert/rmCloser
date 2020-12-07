@@ -59,6 +59,7 @@ rmCloser.callback = function rmCloserCallback(e) {
 				value: 'moved',
 				event: function() {
 					document.getElementsByName('customResult')[0].style.display = 'none';
+					document.getElementsByName('customResult')[0].required = false;
 				}
 			},
 			{
@@ -66,6 +67,7 @@ rmCloser.callback = function rmCloserCallback(e) {
 				value: 'not moved',
 				event: function() {
 					document.getElementsByName('customResult')[0].style.display = 'none';
+					document.getElementsByName('customResult')[0].required = false;
 				}
 			},
 			{
@@ -73,6 +75,7 @@ rmCloser.callback = function rmCloserCallback(e) {
 				value: 'no consensus',
 				event: function() {
 					document.getElementsByName('customResult')[0].style.display = 'none';
+					document.getElementsByName('customResult')[0].required = false;
 				}
 			},
 			{
@@ -80,6 +83,7 @@ rmCloser.callback = function rmCloserCallback(e) {
 				value: 'custom',
 				event: function() {
 					document.getElementsByName('customResult')[0].style.display = 'inline';
+					document.getElementsByName('customResult')[0].required = true;
 				}
 			}
 		]
@@ -87,7 +91,7 @@ rmCloser.callback = function rmCloserCallback(e) {
 	
 	form.append({
 		type: 'input',
-		name: 'customResult',
+		name: 'customResult'
 	});
 
 	form.append({ type: 'submit', label: 'Submit' });
