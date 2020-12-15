@@ -8,11 +8,12 @@ $.when(
 	$.ready
 ).then(function() {
 	if (document.getElementById("reqmovetag") !== null) {
-		document.getElementById("reqmovetag").innerHTML = "<button id='rmCloserClose'>Close</button><button id='rmCloserRelist'>Relist</button><button id='rmCloserConfirm' style='display:none'>Confirm relist</button><button id='rmCloserCancel' style='display:none'>Cancel relist</button>";
+		document.getElementById("reqmovetag").innerHTML = "<button id='rmCloserClose'>Close</button><button id='rmCloserRelist'>Relist</button><button id='rmCloserConfirm' style='display:none'>Confirm relist</button><button id='rmCloserCancel' style='display:none'>Cancel relist</button><button id='rmCloserNotify'>Notify WikiProjects</button>";
 		$('#rmCloserClose').click(rmCloser.callback);
 		$('#rmCloserRelist').click(rmCloser.confirmRelist);
 		$('#rmCloserConfirm').click(rmCloser.relist);
 		$('#rmCloserCancel').click(rmCloser.cancelRelist);
+		$('#rmCloserNotify').click(rmCloser.notify);
 	}
 });
 
@@ -299,5 +300,105 @@ rmCloser.relist = function rmCloserRelist(e) {
 		talkpage.setEditSummary('Relisted requested move' + rmCloser.advert);
 		talkpage.save(Morebits.status.actionCompleted('Relisted.'));
 	});
+};
+
+rmCloser.notify = function rmCloserNotify(e) {
+	if (e) e.preventDefault();
+	var wikiProjectTemplates = document.getElementsByClassName("wpb-project_link");
+	var wikiProjectNames = [];
+	var wikiProjects = [];
+	for(var i=0; i<wikiProjectTemplates.length; i++){
+		var wikiProjectName = wikiProjectTemplates[i].innerHTML;
+		var wikiProjectTalk = mw.Title.newFromText(wikiProjectTemplates[i].innerHTML).getTalkPage().toText();
+		wikiProjectNames.push(wikiProjectName);
+		wikiProjects.push(wikiProjectTalk);
+	}
+	
+	if(wikiProjects.length == 0){
+		mw.notify('No WikiProject banners found on this page');
+	} else{
+		var Window = new Morebits.simpleWindow(600, 450);
+		Window.setTitle( "Notify WikiProjects about requested move" );
+		Window.setScriptName('rmCloser');
+		Window.addFooterLink('Script documentation', 'User:TheTVExpert/rmCloser');
+
+		var form = new Morebits.quickForm(rmCloser.notifyEvaluate);
+
+		form.append({
+			type: 'div',
+			label: 'WikiProjects with banners on this page:'
+		});
+
+		form.append({
+			type: 'radio',
+			name: 'wikiProject',
+			list: wikiProjects.map(function (wp) {
+				var wplabel = wikiProjectNames[wikiProjects.indexOf(wp)];
+				return { type: 'option', label: wplabel, value: wp };
+			})
+		});
+
+		if(wikiProjects[0] != 'none'){
+			form.append({ type: 'submit', label: 'Notify selected WikiProject' });
+		}
+
+		var formResult = form.render();
+		Window.setContent(formResult);
+		Window.display();
+	}
+};
+
+rmCloser.notifyEvaluate = function(e) {
+	var form = e.target;
+	rmCloser.params = Morebits.quickForm.getInputData(form);
+
+	Morebits.simpleWindow.setButtonsEnabled(false);
+	Morebits.status.init(form);
+	
+	var wikiProjectToNotify = rmCloser.params.wikiProject;
+	if(wikiProjectToNotify == undefined){
+		var noWP = new Morebits.status('Error', 'No WikiProject selected', 'error');
+	} else{
+		var talkpage = new Morebits.wiki.page(wikiProjectToNotify, 'Notifying ' + wikiProjectToNotify + '.');
+		talkpage.setFollowRedirect(true);
+		talkpage.load(function(talkpage) {
+			var text = talkpage.getPageText();
+
+			var sections = document.getElementsByClassName("mw-headline");
+			var sectionArray = [];
+			for(var i=0; i<sections.length; i++){
+				sectionArray.push(sections[i].innerHTML);	
+			}
+			sectionArray.reverse();
+			var sectionToFind = /Requested move.*/;
+			var moveSection;
+			for(var i=0; i<sectionArray.length; i++){
+				if(sectionToFind.test(sectionArray[i])){
+					moveSection = sectionArray[i];
+					break;
+				}
+			}
+			rmCloser.talktitle = mw.Title.newFromText(Morebits.pageNameNorm).getTalkPage().toText();
+			var pageAndSection = rmCloser.talktitle + "#" + moveSection;
+			
+			if(text.match(pageAndSection) != null){
+				if(confirm("Selected WikiProject may have already been notified of the discussion. Do you wish to proceed?")){
+					text += "\n\n== Requested move at [[" + pageAndSection + "]] ==\n[[File:Information.svg|30px|left]] There is a requested move discussion at [[" + pageAndSection + "]] that may be of interest to members of this WikiProject. ~~~~";
+
+					talkpage.setPageText(text);
+					talkpage.setEditSummary('Notifying of requested move' + rmCloser.advert);
+					talkpage.save(Morebits.status.actionCompleted('Notified.'));
+				} else{
+					var cancelNotify = new Morebits.status('Error', 'Notification canceled', 'error');	
+				}
+			} else{
+				text += "\n\n== Requested move at [[" + pageAndSection + "]] ==\n[[File:Information.svg|30px|left]] There is a requested move discussion at [[" + pageAndSection + "]] that may be of interest to members of this WikiProject. ~~~~";
+
+				talkpage.setPageText(text);
+				talkpage.setEditSummary('Notifying of requested move' + rmCloser.advert);
+				talkpage.save(Morebits.status.actionCompleted('Notified.'));	
+			}
+		});
+	}
 };
 //</nowiki>
