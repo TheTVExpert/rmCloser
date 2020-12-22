@@ -38,11 +38,11 @@ rmCloser.advert = ' using [[User:TheTVExpert/rmCloser|rmCloser]]';
 rmCloser.callback = function rmCloserCallback(e) {
 	if (e) e.preventDefault();
 
-	var Window = new Morebits.simpleWindow(600, 450);
-	Window.setTitle( "Close requested move" );
-	Window.setScriptName('rmCloser');
-	Window.addFooterLink('RM Closing instruction', 'WP:RMCI');
-	Window.addFooterLink('Script documentation', 'User:TheTVExpert/rmCloser');
+	rmCloser.Window = new Morebits.simpleWindow(600, 450);
+	rmCloser.Window.setTitle( "Close requested move" );
+	rmCloser.Window.setScriptName('rmCloser');
+	rmCloser.Window.addFooterLink('RM Closing instruction', 'WP:RMCI');
+	rmCloser.Window.addFooterLink('Script documentation', 'User:TheTVExpert/rmCloser');
 
 	var form = new Morebits.quickForm(rmCloser.evaluate);
 	
@@ -98,8 +98,8 @@ rmCloser.callback = function rmCloserCallback(e) {
 	form.append({ type: 'submit', label: 'Submit' });
 
 	var formResult = form.render();
-	Window.setContent(formResult);
-	Window.display();
+	rmCloser.Window.setContent(formResult);
+	rmCloser.Window.display();
 	
 	document.getElementsByName('customResult')[0].style.display = 'none';
 };
@@ -189,7 +189,6 @@ rmCloser.evaluate = function(e) {
 				destination = destination[1];
 			}
 		}
-		destination = '|destination=' + destination;
 		var moveSectionPlain = moveSection.slice(3,-3);
 		var link = '|link=Special:Permalink/' + talkpage.getCurrentID() + '#' + moveSectionPlain;
 		
@@ -203,7 +202,7 @@ rmCloser.evaluate = function(e) {
 				}
 			}
 		}
-		text = text.replace(archives[0], '{{old move'+ date + from + destination + '|result=' + result + link +'}}\n\n' + archives[0]);
+		text = text.replace(archives[0], '{{old move'+ date + from + '|destination=' + destination + '|result=' + result + link +'}}\n\n' + archives[0]);
 	
 		talkpage.setPageText(text);
 		talkpage.setEditSummary('Closing requested move; ' + result + rmCloser.advert);
@@ -234,6 +233,7 @@ rmCloser.evaluate = function(e) {
 				}
 			}
 			
+			var pagesLeft = otherPages.length;
 			for(var j=0; j<otherPages.length; j++){
 				var otherTitle_obj = mw.Title.newFromText(otherPages[j]);
 				rmCloser.otherTalktitle = otherTitle_obj.getTalkPage().toText();
@@ -263,9 +263,132 @@ rmCloser.evaluate = function(e) {
 					otherPage.setPageText(otherText);
 					otherPage.setEditSummary('Closing requested move; ' + result + rmCloser.advert);
 					otherPage.save(Morebits.status.actionCompleted('Moved closed.'));
+					pagesLeft--;
 				});
 			}
+			
+			if(result == "moved"){
+				var waitInterval = setInterval(function(){
+					if(pagesLeft == 0){
+						rmCloser.movePages(rmCloser.title,destination,otherPages,otherDestinations);
+						clearInterval(waitInterval);
+					}
+				}, 500);
+			}
+		} else if(result == "moved"){
+			var emptyArray = [];
+			rmCloser.movePages(rmCloser.title,destination,emptyArray,emptyArray);
 		}
+	});
+};
+
+rmCloser.movePages = function rmCloserMovePages(curr1,dest1,currList,destList){
+	var form = new Morebits.quickForm();
+	
+	form.append({
+		type: 'header',
+		label: 'Move pages'
+	});
+
+	form.append({
+		type: 'div',
+		label: curr1 + ' → ' + dest1
+	});
+	
+	form.append({
+		type: 'button',
+		label: 'Move directly',
+		event: function() {
+			rmCloser.directMove(curr1,dest1,false);
+		}
+	});
+	
+	if(!Morebits.userIsInGroup('sysop') && !Morebits.userIsInGroup('extendedmover')){
+		form.append({
+			type: 'button',
+			label: 'Submit technical request',
+			event: function() {
+				rmCloser.submitRMTR(curr1,dest1);
+			}
+		});
+	} else{
+		form.append({
+			type: 'button',
+			label: 'Move directly without leaving a redirect',
+			event: function() {
+				rmCloser.directMove(curr1,dest1,true);	
+			}
+		});
+	}
+	
+	for(var i=0; i<currList.length; i++){
+		form.append({ type: 'div', label: currList[i] + ' → ' + destList[i] });
+		form.append({ type: 'button', name: currList[i], extra: destList[i], label: 'Move directly', event: function() { rmCloser.directMove(this.name,this.extra,false); } });
+		if(!Morebits.userIsInGroup('sysop') && !Morebits.userIsInGroup('extendedmover')){
+			form.append({ type: 'button', name: currList[i], extra: destList[i], label: 'Submit technical request', event: function() { rmCloser.submitRMTR(this.name,this.extra); } });
+		} else{
+			form.append({ type: 'button', name: currList[i], extra: destList[i], label: 'Move directly without leaving a redirect', event: function() { rmCloser.directMove(this.name,this.extra,true); } });
+		}
+	}
+
+	var formResult = form.render();
+	rmCloser.Window.setContent(formResult);
+	rmCloser.Window.display();
+};
+
+rmCloser.directMove = function rmCloserDirectMove(curr,dest,suppressRedirect) {
+	var pageToMove = new Morebits.wiki.page(curr, 'Moving ' + curr + ' to ' + dest + '.');
+	pageToMove.setMoveDestination(dest);
+	pageToMove.setMoveSubpages(true);
+	pageToMove.setMoveTalkPage(true);
+	pageToMove.setMoveSuppressRedirect(suppressRedirect);
+	var sections = document.getElementsByClassName("mw-headline");
+	var sectionArray = [];
+	for(var i=0; i<sections.length; i++){
+		sectionArray.push(sections[i].innerHTML);	
+	}
+	sectionArray.reverse();
+	var sectionToFind = /Requested move.*/;
+	var moveSection;
+	for(var i=0; i<sectionArray.length; i++){
+		if(sectionToFind.test(sectionArray[i])){
+			moveSection = sectionArray[i];
+			break;
+		}
+	}
+	rmCloser.talktitle = mw.Title.newFromText(Morebits.pageNameNorm).getTalkPage().toText();
+	var pageAndSection = rmCloser.talktitle + "#" + moveSection;
+	pageToMove.setEditSummary('Moved per [[' + pageAndSection + ']]' + rmCloser.advert);
+	pageToMove.move(Morebits.status.actionCompleted('Moved.'));
+};
+
+rmCloser.submitRMTR = function rmCloserSubmitRMTR(curr,dest) {
+	var rmtr = new Morebits.wiki.page('Wikipedia:Requested moves/Technical requests', 'Submitting request at WP:RM/TR');
+	rmtr.load(function(page) {
+		var text = rmtr.getPageText();
+		var textToFind = /---- and enter on a new line.* -->/;
+		var sections = document.getElementsByClassName("mw-headline");
+		var sectionArray = [];
+		for(var i=0; i<sections.length; i++){
+			sectionArray.push(sections[i].innerHTML);	
+		}
+		sectionArray.reverse();
+		var sectionToFind = /Requested move.*/;
+		var moveSection;
+		for(var i=0; i<sectionArray.length; i++){
+			if(sectionToFind.test(sectionArray[i])){
+				moveSection = sectionArray[i];
+				break;
+			}
+		}
+		rmCloser.talktitle = mw.Title.newFromText(Morebits.pageNameNorm).getTalkPage().toText();
+		var pageAndSection = rmCloser.talktitle + "#" + moveSection;
+		var rmtrText = '{{subst:RMassist|1=' + curr + '|2=' + dest + '|reason=Per [[' + pageAndSection + ']].}}';
+		text = text.replace(textToFind, '$&\n' + rmtrText);
+		console.log(text);
+		rmtr.setPageText(text);
+		rmtr.setEditSummary('Add request' + rmCloser.advert);
+		rmtr.save(Morebits.status.actionCompleted('Requested.'));
 	});
 };
 
