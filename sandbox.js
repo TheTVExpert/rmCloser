@@ -237,7 +237,7 @@ rmCloser.evaluate = function(e) {
 			for(var j=0; j<otherPages.length; j++){
 				var otherTitle_obj = mw.Title.newFromText(otherPages[j]);
 				rmCloser.otherTalktitle = otherTitle_obj.getTalkPage().toText();
-				var otherPage = new Morebits.wiki.page(rmCloser.otherTalktitle, 'Added {{old move}} to ' + rmCloser.otherTalktitle + '.');
+				var otherPage = new Morebits.wiki.page(rmCloser.otherTalktitle, 'Adding {{old move}} to ' + rmCloser.otherTalktitle + '.');
 				otherPage.load(function(otherPage) {
 					var otherText = otherPage.getPageText();
 					var title = mw.Title.newFromText(otherPage.getPageName()).getSubjectPage().toText();
@@ -274,15 +274,20 @@ rmCloser.evaluate = function(e) {
 						clearInterval(waitInterval);
 					}
 				}, 500);
+			} else{
+				setTimeout(function(){ location.reload() }, 2000);
 			}
 		} else if(result == "moved"){
 			var emptyArray = [];
 			rmCloser.movePages(rmCloser.title,destination,emptyArray,emptyArray);
+		} else{
+			setTimeout(function(){ location.reload() }, 2000);	
 		}
 	});
 };
 
 rmCloser.movePages = function rmCloserMovePages(curr1,dest1,currList,destList){
+	var numberToRemove = currList.length+1;
 	var form = new Morebits.quickForm();
 	
 	form.append({
@@ -292,48 +297,72 @@ rmCloser.movePages = function rmCloserMovePages(curr1,dest1,currList,destList){
 
 	form.append({
 		type: 'div',
+		className: 'rmCloserMovePages' + curr1,
 		label: curr1 + ' → ' + dest1
 	});
 	
 	form.append({
 		type: 'button',
+		className: 'rmCloserMovePages' + curr1,
 		label: 'Move directly',
 		event: function() {
 			rmCloser.directMove(curr1,dest1,false);
+			for(var i=0; i<document.getElementsByClassName('rmCloserMovePages' + curr1).length; i++){
+				document.getElementsByClassName('rmCloserMovePages' + curr1)[i].style.display = 'none';
+			}
+			numberToRemove--;
 		}
 	});
 	
 	if(!Morebits.userIsInGroup('sysop') && !Morebits.userIsInGroup('extendedmover')){
 		form.append({
 			type: 'button',
+			className: 'rmCloserMovePages' + curr1,
 			label: 'Submit technical request',
 			event: function() {
 				rmCloser.submitRMTR(curr1,dest1);
+				for(var i=0; i<document.getElementsByClassName('rmCloserMovePages' + curr1).length; i++){
+					document.getElementsByClassName('rmCloserMovePages' + curr1)[i].style.display = 'none';
+				}
+				numberToRemove--;
 			}
 		});
 	} else{
 		form.append({
 			type: 'button',
+			className: 'rmCloserMovePages' + curr1,
 			label: 'Move directly without leaving a redirect',
 			event: function() {
-				rmCloser.directMove(curr1,dest1,true);	
+				rmCloser.directMove(curr1,dest1,true);
+				for(var i=0; i<document.getElementsByClassName('rmCloserMovePages' + curr1).length; i++){
+					document.getElementsByClassName('rmCloserMovePages' + curr1)[i].style.display = 'none';
+				}
+				numberToRemove--;
 			}
 		});
 	}
 	
 	for(var i=0; i<currList.length; i++){
-		form.append({ type: 'div', label: currList[i] + ' → ' + destList[i] });
-		form.append({ type: 'button', name: currList[i], extra: destList[i], label: 'Move directly', event: function() { rmCloser.directMove(this.name,this.extra,false); } });
+		form.append({ type: 'div', className: 'rmCloserMovePages' + currList[i], label: currList[i] + ' → ' + destList[i] });
+		form.append({ type: 'button', className: 'rmCloserMovePages' + currList[i], name: currList[i], extra: destList[i], label: 'Move directly', event: function() { rmCloser.directMove(this.name,this.extra,false); for(var j=0; j<document.getElementsByClassName('rmCloserMovePages' + this.name).length; j++){ document.getElementsByClassName('rmCloserMovePages' + this.name)[j].style.display = 'none'; } numberToRemove--; } });
 		if(!Morebits.userIsInGroup('sysop') && !Morebits.userIsInGroup('extendedmover')){
-			form.append({ type: 'button', name: currList[i], extra: destList[i], label: 'Submit technical request', event: function() { rmCloser.submitRMTR(this.name,this.extra); } });
+			form.append({ type: 'button', className: 'rmCloserMovePages' + currList[i], name: currList[i], extra: destList[i], label: 'Submit technical request', event: function() { rmCloser.submitRMTR(this.name,this.extra); for(var j=0; j<document.getElementsByClassName('rmCloserMovePages' + this.name).length; j++){ document.getElementsByClassName('rmCloserMovePages' + this.name)[j].style.display = 'none'; } numberToRemove--; } });
 		} else{
-			form.append({ type: 'button', name: currList[i], extra: destList[i], label: 'Move directly without leaving a redirect', event: function() { rmCloser.directMove(this.name,this.extra,true); } });
+			form.append({ type: 'button', className: 'rmCloserMovePages' + currList[i], name: currList[i], extra: destList[i], label: 'Move directly without leaving a redirect', event: function() { rmCloser.directMove(this.name,this.extra,true); for(var j=0; j<document.getElementsByClassName('rmCloserMovePages' + this.name).length; j++){ document.getElementsByClassName('rmCloserMovePages' + this.name)[j].style.display = 'none'; } numberToRemove--; } });
 		}
 	}
 
 	var formResult = form.render();
 	rmCloser.Window.setContent(formResult);
 	rmCloser.Window.display();
+	
+	var moveInterval = setInterval(function(){
+		if(numberToRemove == 0){
+			rmCloser.Window.close();
+			clearInterval(moveInterval);
+			setTimeout(function(){ location.reload() }, 2000);
+		}
+	}, 500);
 };
 
 rmCloser.directMove = function rmCloserDirectMove(curr,dest,suppressRedirect) {
@@ -385,7 +414,6 @@ rmCloser.submitRMTR = function rmCloserSubmitRMTR(curr,dest) {
 		var pageAndSection = rmCloser.talktitle + "#" + moveSection;
 		var rmtrText = '{{subst:RMassist|1=' + curr + '|2=' + dest + '|reason=Per [[' + pageAndSection + ']].}}';
 		text = text.replace(textToFind, '$&\n' + rmtrText);
-		console.log(text);
 		rmtr.setPageText(text);
 		rmtr.setEditSummary('Add request' + rmCloser.advert);
 		rmtr.save(Morebits.status.actionCompleted('Requested.'));
@@ -422,6 +450,8 @@ rmCloser.relist = function rmCloserRelist(e) {
 		talkpage.setPageText(text);
 		talkpage.setEditSummary('Relisted requested move' + rmCloser.advert);
 		talkpage.save(Morebits.status.actionCompleted('Relisted.'));
+		document.getElementById("reqmovetag").innerHTML = "";
+		setTimeout(function(){ location.reload() }, 2000);
 	});
 };
 
