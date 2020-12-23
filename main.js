@@ -8,11 +8,12 @@ $.when(
 	$.ready
 ).then(function() {
 	if (document.getElementById("reqmovetag") !== null) {
-		document.getElementById("reqmovetag").innerHTML = "<button id='rmCloserClose'>Close</button><button id='rmCloserRelist'>Relist</button><button id='rmCloserConfirm' style='display:none'>Confirm relist</button><button id='rmCloserCancel' style='display:none'>Cancel relist</button>";
+		document.getElementById("reqmovetag").innerHTML = "<button id='rmCloserClose'>Close</button><button id='rmCloserRelist'>Relist</button><button id='rmCloserConfirm' style='display:none'>Confirm relist</button><button id='rmCloserCancel' style='display:none'>Cancel relist</button><button id='rmCloserNotify'>Notify WikiProjects</button>";
 		$('#rmCloserClose').click(rmCloser.callback);
 		$('#rmCloserRelist').click(rmCloser.confirmRelist);
 		$('#rmCloserConfirm').click(rmCloser.relist);
 		$('#rmCloserCancel').click(rmCloser.cancelRelist);
+		$('#rmCloserNotify').click(rmCloser.notify);
 	}
 });
 
@@ -37,11 +38,11 @@ rmCloser.advert = ' using [[User:TheTVExpert/rmCloser|rmCloser]]';
 rmCloser.callback = function rmCloserCallback(e) {
 	if (e) e.preventDefault();
 
-	var Window = new Morebits.simpleWindow(600, 450);
-	Window.setTitle( "Close requested move" );
-	Window.setScriptName('rmCloser');
-	Window.addFooterLink('RM Closing instruction', 'WP:RMCI');
-	Window.addFooterLink('Script documentation', 'User:TheTVExpert/rmCloser');
+	rmCloser.Window = new Morebits.simpleWindow(600, 450);
+	rmCloser.Window.setTitle( "Close requested move" );
+	rmCloser.Window.setScriptName('rmCloser');
+	rmCloser.Window.addFooterLink('RM Closing instruction', 'WP:RMCI');
+	rmCloser.Window.addFooterLink('Script documentation', 'User:TheTVExpert/rmCloser');
 
 	var form = new Morebits.quickForm(rmCloser.evaluate);
 	
@@ -59,6 +60,7 @@ rmCloser.callback = function rmCloserCallback(e) {
 				value: 'moved',
 				event: function() {
 					document.getElementsByName('customResult')[0].style.display = 'none';
+					document.getElementsByName('customResult')[0].required = false;
 				}
 			},
 			{
@@ -66,6 +68,7 @@ rmCloser.callback = function rmCloserCallback(e) {
 				value: 'not moved',
 				event: function() {
 					document.getElementsByName('customResult')[0].style.display = 'none';
+					document.getElementsByName('customResult')[0].required = false;
 				}
 			},
 			{
@@ -73,6 +76,7 @@ rmCloser.callback = function rmCloserCallback(e) {
 				value: 'no consensus',
 				event: function() {
 					document.getElementsByName('customResult')[0].style.display = 'none';
+					document.getElementsByName('customResult')[0].required = false;
 				}
 			},
 			{
@@ -80,6 +84,7 @@ rmCloser.callback = function rmCloserCallback(e) {
 				value: 'custom',
 				event: function() {
 					document.getElementsByName('customResult')[0].style.display = 'inline';
+					document.getElementsByName('customResult')[0].required = true;
 				}
 			}
 		]
@@ -87,14 +92,14 @@ rmCloser.callback = function rmCloserCallback(e) {
 	
 	form.append({
 		type: 'input',
-		name: 'customResult',
+		name: 'customResult'
 	});
 
 	form.append({ type: 'submit', label: 'Submit' });
 
 	var formResult = form.render();
-	Window.setContent(formResult);
-	Window.display();
+	rmCloser.Window.setContent(formResult);
+	rmCloser.Window.display();
 	
 	document.getElementsByName('customResult')[0].style.display = 'none';
 };
@@ -120,6 +125,25 @@ rmCloser.evaluate = function(e) {
 		var text = talkpage.getPageText();
 		var template = text.match(/{{[Rr]equested move\/dated\|.*\n?.*}}/)[0];
 
+		var templateFound = false;
+		var numberOfMoves = 0;
+		var line;
+		var textToFind = text.split('\n');
+		for (var i = 0; i < textToFind.length; i++) {	
+			line = textToFind[i];
+			if(templateFound == false){
+				if(/{{[Rr]equested move\/dated/.test(line)){
+					templateFound = true;
+				}
+			} else if(templateFound == true){
+				if (/ \(UTC\)/.test(line)){
+					break;
+				} else if(/→/.test(line)){
+					numberOfMoves++;
+				}
+			}
+		}
+		
 		var userGroupText = "";
 		if(Morebits.userIsInGroup('sysop')){
 			userGroupText = "";
@@ -148,6 +172,8 @@ rmCloser.evaluate = function(e) {
 			}
 		}
 		
+		var multiMove = false;
+		
 		var date = '|date=' + moveSection.slice(18,34);
 		var from = '';
 		if(result == "moved"){
@@ -155,6 +181,7 @@ rmCloser.evaluate = function(e) {
 		}
 		var destination = template.match(/\|new1=(.*)\|current2=/);
 		if(destination != null){
+			multiMove = true;
 			destination = destination[1];
 		} else{
 			destination = template.match(/\|(.*)}}/);
@@ -162,16 +189,234 @@ rmCloser.evaluate = function(e) {
 				destination = destination[1];
 			}
 		}
-		destination = '|destination=' + destination;
 		var moveSectionPlain = moveSection.slice(3,-3);
 		var link = '|link=Special:Permalink/' + talkpage.getCurrentID() + '#' + moveSectionPlain;
 		
-		var firstSection = text.match(/==.*==/)[0];
-		text = text.replace(firstSection, '{{old move'+ date + from + destination + '|result=' + result + link +'}}\n\n' + firstSection);
+		var archives = text.match(/{{[Aa]rchives/);
+		if(archives == null){
+			archives = text.match(/{{[Aa]rchive box/);
+			if(archives == null){
+				archives = text.match(/{{[Aa]rchivebox/);
+				if(archives == null){
+					archives = text.match(/==.*==/);
+				}
+			}
+		}
+		text = text.replace(archives[0], '{{old move'+ date + from + '|destination=' + destination + '|result=' + result + link +'}}\n\n' + archives[0]);
 	
 		talkpage.setPageText(text);
 		talkpage.setEditSummary('Closing requested move; ' + result + rmCloser.advert);
 		talkpage.save(Morebits.status.actionCompleted('Moved closed.'));
+		
+		if(multiMove == true){
+			var otherDestinations = [];
+			var otherPages = [];
+			for(i=2; i<(numberOfMoves+1); i++){
+				var text1 = "\\|current" + i + "=(.*)\\|new" + i;
+				var reg1 = new RegExp(text1);
+				var curr = template.match(reg1);
+				var dest;
+				if(i != numberOfMoves){
+					var nextNum = i+1;
+					var text2 = "\\|new" + i + "=(.*)\\|current" + nextNum;
+					var reg2 = new RegExp(text2);
+					dest = template.match(reg2);
+				} else{
+					var text3 = "\\|new" + i + "=(.*)\\|}}";
+					var reg3 = new RegExp(text3);
+					dest = template.match(reg3);
+				}
+				
+				if(curr != null && dest != null){
+					otherPages.push(curr[1]);
+					otherDestinations.push(dest[1]);
+				}
+			}
+			
+			var pagesLeft = otherPages.length;
+			for(var j=0; j<otherPages.length; j++){
+				var otherTitle_obj = mw.Title.newFromText(otherPages[j]);
+				rmCloser.otherTalktitle = otherTitle_obj.getTalkPage().toText();
+				var otherPage = new Morebits.wiki.page(rmCloser.otherTalktitle, 'Adding {{old move}} to ' + rmCloser.otherTalktitle + '.');
+				otherPage.load(function(otherPage) {
+					var otherText = otherPage.getPageText();
+					var title = mw.Title.newFromText(otherPage.getPageName()).getSubjectPage().toText();
+					var OMcurr = otherPages[otherPages.indexOf(title)];
+					var OMdest = otherDestinations[otherPages.indexOf(title)];
+					var otherFrom = '';
+					if(result == "moved"){
+						otherFrom = '|from=' + OMcurr;
+					}
+					var otherDestination = '|destination=' + OMdest;
+					var otherArchives = otherText.match(/{{[Aa]rchives/);
+					if(otherArchives == null){
+						otherArchives = otherText.match(/{{[Aa]rchive box/);
+						if(otherArchives == null){
+							otherArchives = otherText.match(/{{[Aa]rchivebox/);
+							if(otherArchives == null){
+								otherArchives = otherText.match(/==.*==/);
+							}
+						}
+					}
+					otherText = otherText.replace(otherArchives[0], '{{old move'+ date + otherFrom + otherDestination + '|result=' + result + link +'}}\n\n' + otherArchives[0]);
+
+					otherPage.setPageText(otherText);
+					otherPage.setEditSummary('Closing requested move; ' + result + rmCloser.advert);
+					otherPage.save(Morebits.status.actionCompleted('Moved closed.'));
+					pagesLeft--;
+				});
+			}
+			
+			if(result == "moved"){
+				var waitInterval = setInterval(function(){
+					if(pagesLeft == 0){
+						rmCloser.movePages(rmCloser.title,destination,otherPages,otherDestinations);
+						clearInterval(waitInterval);
+					}
+				}, 500);
+			} else{
+				setTimeout(function(){ location.reload() }, 2000);
+			}
+		} else if(result == "moved"){
+			var emptyArray = [];
+			rmCloser.movePages(rmCloser.title,destination,emptyArray,emptyArray);
+		} else{
+			setTimeout(function(){ location.reload() }, 2000);	
+		}
+	});
+};
+
+rmCloser.movePages = function rmCloserMovePages(curr1,dest1,currList,destList){
+	var numberToRemove = currList.length+1;
+	var form = new Morebits.quickForm();
+	
+	form.append({
+		type: 'header',
+		label: 'Move pages'
+	});
+
+	form.append({
+		type: 'div',
+		className: 'rmCloserMovePages' + curr1,
+		label: curr1 + ' → ' + dest1
+	});
+	
+	form.append({
+		type: 'button',
+		className: 'rmCloserMovePages' + curr1,
+		label: 'Move directly',
+		event: function() {
+			rmCloser.directMove(curr1,dest1,false);
+			for(var i=0; i<document.getElementsByClassName('rmCloserMovePages' + curr1).length; i++){
+				document.getElementsByClassName('rmCloserMovePages' + curr1)[i].style.display = 'none';
+			}
+			numberToRemove--;
+		}
+	});
+	
+	if(!Morebits.userIsInGroup('sysop') && !Morebits.userIsInGroup('extendedmover')){
+		form.append({
+			type: 'button',
+			className: 'rmCloserMovePages' + curr1,
+			label: 'Submit technical request',
+			event: function() {
+				rmCloser.submitRMTR(curr1,dest1);
+				for(var i=0; i<document.getElementsByClassName('rmCloserMovePages' + curr1).length; i++){
+					document.getElementsByClassName('rmCloserMovePages' + curr1)[i].style.display = 'none';
+				}
+				numberToRemove--;
+			}
+		});
+	} else{
+		form.append({
+			type: 'button',
+			className: 'rmCloserMovePages' + curr1,
+			label: 'Move directly without leaving a redirect',
+			event: function() {
+				rmCloser.directMove(curr1,dest1,true);
+				for(var i=0; i<document.getElementsByClassName('rmCloserMovePages' + curr1).length; i++){
+					document.getElementsByClassName('rmCloserMovePages' + curr1)[i].style.display = 'none';
+				}
+				numberToRemove--;
+			}
+		});
+	}
+	
+	for(var i=0; i<currList.length; i++){
+		form.append({ type: 'div', className: 'rmCloserMovePages' + currList[i], label: currList[i] + ' → ' + destList[i] });
+		form.append({ type: 'button', className: 'rmCloserMovePages' + currList[i], name: currList[i], extra: destList[i], label: 'Move directly', event: function() { rmCloser.directMove(this.name,this.extra,false); for(var j=0; j<document.getElementsByClassName('rmCloserMovePages' + this.name).length; j++){ document.getElementsByClassName('rmCloserMovePages' + this.name)[j].style.display = 'none'; } numberToRemove--; } });
+		if(!Morebits.userIsInGroup('sysop') && !Morebits.userIsInGroup('extendedmover')){
+			form.append({ type: 'button', className: 'rmCloserMovePages' + currList[i], name: currList[i], extra: destList[i], label: 'Submit technical request', event: function() { rmCloser.submitRMTR(this.name,this.extra); for(var j=0; j<document.getElementsByClassName('rmCloserMovePages' + this.name).length; j++){ document.getElementsByClassName('rmCloserMovePages' + this.name)[j].style.display = 'none'; } numberToRemove--; } });
+		} else{
+			form.append({ type: 'button', className: 'rmCloserMovePages' + currList[i], name: currList[i], extra: destList[i], label: 'Move directly without leaving a redirect', event: function() { rmCloser.directMove(this.name,this.extra,true); for(var j=0; j<document.getElementsByClassName('rmCloserMovePages' + this.name).length; j++){ document.getElementsByClassName('rmCloserMovePages' + this.name)[j].style.display = 'none'; } numberToRemove--; } });
+		}
+	}
+
+	var formResult = form.render();
+	rmCloser.Window.setContent(formResult);
+	rmCloser.Window.display();
+	
+	var moveInterval = setInterval(function(){
+		if(numberToRemove == 0){
+			rmCloser.Window.close();
+			clearInterval(moveInterval);
+			setTimeout(function(){ location.reload() }, 2000);
+		}
+	}, 500);
+};
+
+rmCloser.directMove = function rmCloserDirectMove(curr,dest,suppressRedirect) {
+	var pageToMove = new Morebits.wiki.page(curr, 'Moving ' + curr + ' to ' + dest + '.');
+	pageToMove.setMoveDestination(dest);
+	pageToMove.setMoveSubpages(true);
+	pageToMove.setMoveTalkPage(true);
+	pageToMove.setMoveSuppressRedirect(suppressRedirect);
+	var sections = document.getElementsByClassName("mw-headline");
+	var sectionArray = [];
+	for(var i=0; i<sections.length; i++){
+		sectionArray.push(sections[i].innerHTML);	
+	}
+	sectionArray.reverse();
+	var sectionToFind = /Requested move.*/;
+	var moveSection;
+	for(var i=0; i<sectionArray.length; i++){
+		if(sectionToFind.test(sectionArray[i])){
+			moveSection = sectionArray[i];
+			break;
+		}
+	}
+	rmCloser.talktitle = mw.Title.newFromText(Morebits.pageNameNorm).getTalkPage().toText();
+	var pageAndSection = rmCloser.talktitle + "#" + moveSection;
+	pageToMove.setEditSummary('Moved per [[' + pageAndSection + ']]' + rmCloser.advert);
+	pageToMove.move(Morebits.status.actionCompleted('Moved.'));
+};
+
+rmCloser.submitRMTR = function rmCloserSubmitRMTR(curr,dest) {
+	var rmtr = new Morebits.wiki.page('Wikipedia:Requested moves/Technical requests', 'Submitting request at WP:RM/TR');
+	rmtr.load(function(page) {
+		var text = rmtr.getPageText();
+		var textToFind = /---- and enter on a new line.* -->/;
+		var sections = document.getElementsByClassName("mw-headline");
+		var sectionArray = [];
+		for(var i=0; i<sections.length; i++){
+			sectionArray.push(sections[i].innerHTML);	
+		}
+		sectionArray.reverse();
+		var sectionToFind = /Requested move.*/;
+		var moveSection;
+		for(var i=0; i<sectionArray.length; i++){
+			if(sectionToFind.test(sectionArray[i])){
+				moveSection = sectionArray[i];
+				break;
+			}
+		}
+		rmCloser.talktitle = mw.Title.newFromText(Morebits.pageNameNorm).getTalkPage().toText();
+		var pageAndSection = rmCloser.talktitle + "#" + moveSection;
+		var rmtrText = '{{subst:RMassist|1=' + curr + '|2=' + dest + '|reason=Per [[' + pageAndSection + ']].}}';
+		text = text.replace(textToFind, '$&\n' + rmtrText);
+		rmtr.setPageText(text);
+		rmtr.setEditSummary('Add request' + rmCloser.advert);
+		rmtr.save(Morebits.status.actionCompleted('Requested.'));
 	});
 };
 
@@ -205,6 +450,108 @@ rmCloser.relist = function rmCloserRelist(e) {
 		talkpage.setPageText(text);
 		talkpage.setEditSummary('Relisted requested move' + rmCloser.advert);
 		talkpage.save(Morebits.status.actionCompleted('Relisted.'));
+		document.getElementById("reqmovetag").innerHTML = "";
+		setTimeout(function(){ location.reload() }, 2000);
 	});
+};
+
+rmCloser.notify = function rmCloserNotify(e) {
+	if (e) e.preventDefault();
+	var wikiProjectTemplates = document.getElementsByClassName("wpb-project_link");
+	var wikiProjectNames = [];
+	var wikiProjects = [];
+	for(var i=0; i<wikiProjectTemplates.length; i++){
+		var wikiProjectName = wikiProjectTemplates[i].innerHTML;
+		var wikiProjectTalk = mw.Title.newFromText(wikiProjectTemplates[i].innerHTML).getTalkPage().toText();
+		wikiProjectNames.push(wikiProjectName);
+		wikiProjects.push(wikiProjectTalk);
+	}
+	
+	if(wikiProjects.length == 0){
+		mw.notify('No WikiProject banners found on this page');
+	} else{
+		var Window = new Morebits.simpleWindow(600, 450);
+		Window.setTitle( "Notify WikiProjects about requested move" );
+		Window.setScriptName('rmCloser');
+		Window.addFooterLink('Script documentation', 'User:TheTVExpert/rmCloser');
+
+		var form = new Morebits.quickForm(rmCloser.notifyEvaluate);
+
+		form.append({
+			type: 'div',
+			label: 'WikiProjects with banners on this page:'
+		});
+
+		form.append({
+			type: 'radio',
+			name: 'wikiProject',
+			list: wikiProjects.map(function (wp) {
+				var wplabel = wikiProjectNames[wikiProjects.indexOf(wp)];
+				return { type: 'option', label: wplabel, value: wp };
+			})
+		});
+
+		if(wikiProjects[0] != 'none'){
+			form.append({ type: 'submit', label: 'Notify selected WikiProject' });
+		}
+
+		var formResult = form.render();
+		Window.setContent(formResult);
+		Window.display();
+	}
+};
+
+rmCloser.notifyEvaluate = function(e) {
+	var form = e.target;
+	rmCloser.params = Morebits.quickForm.getInputData(form);
+
+	Morebits.simpleWindow.setButtonsEnabled(false);
+	Morebits.status.init(form);
+	
+	var wikiProjectToNotify = rmCloser.params.wikiProject;
+	if(wikiProjectToNotify == undefined){
+		var noWP = new Morebits.status('Error', 'No WikiProject selected', 'error');
+	} else{
+		var talkpage = new Morebits.wiki.page(wikiProjectToNotify, 'Notifying ' + wikiProjectToNotify + '.');
+		talkpage.setFollowRedirect(true);
+		talkpage.load(function(talkpage) {
+			var text = talkpage.getPageText();
+
+			var sections = document.getElementsByClassName("mw-headline");
+			var sectionArray = [];
+			for(var i=0; i<sections.length; i++){
+				sectionArray.push(sections[i].innerHTML);	
+			}
+			sectionArray.reverse();
+			var sectionToFind = /Requested move.*/;
+			var moveSection;
+			for(var i=0; i<sectionArray.length; i++){
+				if(sectionToFind.test(sectionArray[i])){
+					moveSection = sectionArray[i];
+					break;
+				}
+			}
+			rmCloser.talktitle = mw.Title.newFromText(Morebits.pageNameNorm).getTalkPage().toText();
+			var pageAndSection = rmCloser.talktitle + "#" + moveSection;
+			
+			if(text.match(pageAndSection) != null){
+				if(confirm("Selected WikiProject may have already been notified of the discussion. Do you wish to proceed?")){
+					text += "\n\n== Requested move at [[" + pageAndSection + "]] ==\n[[File:Information.svg|30px|left]] There is a requested move discussion at [[" + pageAndSection + "]] that may be of interest to members of this WikiProject. ~~~~";
+
+					talkpage.setPageText(text);
+					talkpage.setEditSummary('Notifying of requested move' + rmCloser.advert);
+					talkpage.save(Morebits.status.actionCompleted('Notified.'));
+				} else{
+					var cancelNotify = new Morebits.status('Error', 'Notification canceled', 'error');	
+				}
+			} else{
+				text += "\n\n== Requested move at [[" + pageAndSection + "]] ==\n[[File:Information.svg|30px|left]] There is a requested move discussion at [[" + pageAndSection + "]] that may be of interest to members of this WikiProject. ~~~~";
+
+				talkpage.setPageText(text);
+				talkpage.setEditSummary('Notifying of requested move' + rmCloser.advert);
+				talkpage.save(Morebits.status.actionCompleted('Notified.'));	
+			}
+		});
+	}
 };
 //</nowiki>
