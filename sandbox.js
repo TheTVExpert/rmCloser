@@ -14,6 +14,33 @@ $.when(
 		$('#rmCloserConfirm').click(rmCloser.relist);
 		$('#rmCloserCancel').click(rmCloser.cancelRelist);
 		$('#rmCloserNotify').click(rmCloser.notify);
+	} else if(Morebits.pageNameNorm == "Wikipedia:Requested moves/Technical requests"){
+		var externalText = document.getElementsByClassName("external text");
+		var moveLinks = [];
+		for(var i=0; i<externalText.length; i++){
+			if(externalText[i].innerHTML == "move"){
+				moveLinks.push(externalText[i].parentElement.parentElement);
+			}
+		}
+		var parserOutputChildren = document.getElementsByClassName('mw-parser-output')[0].children;
+		var childrenList = [];
+		for(var i=0; i<parserOutputChildren.length; i++){
+			childrenList.push(parserOutputChildren[i].innerHTML);
+		}
+		var contestedHeader = childrenList.indexOf('<span class="mw-headline" id="Contested_technical_requests">Contested technical requests</span><span class="mw-editsection"><span class="mw-editsection-bracket">[</span><a href="/w/index.php?title=Wikipedia:Requested_moves/Technical_requests&amp;action=edit&amp;section=3" title="Edit section: Contested technical requests">edit source</a><span class="mw-editsection-bracket">]</span></span>');
+		var revertUndiscussedHeader = childrenList.indexOf('<span class="mw-headline" id="Requests_to_revert_undiscussed_moves">Requests to revert undiscussed moves</span><span class="mw-editsection"><span class="mw-editsection-bracket">[</span><a href="/w/index.php?title=Wikipedia:Requested_moves/Technical_requests&amp;action=edit&amp;section=4" title="Edit section: Requests to revert undiscussed moves">edit source</a><span class="mw-editsection-bracket">]</span></span>');
+		for(var i=0; i<moveLinks.length; i++){
+			var rmAssistIndex = childrenList.indexOf(moveLinks[i].parentElement.innerHTML);
+			var rmtrButtonSpan = document.createElement("SPAN");
+			if(rmAssistIndex > contestedHeader && rmAssistIndex < revertUndiscussedHeader){
+				rmtrButtonSpan.innerHTML = "<button id='rmCloserRMassistDi" + i + "' onclick='rmCloser.rmtrEvaluate(this.id)'>Discuss</button>";
+			} else{
+				rmtrButtonSpan.innerHTML = "<button id='rmCloserRMassistMD" + i + "' onclick='rmCloser.rmtrEvaluate(this.id)'>Move directly</button><button id='rmCloserRMassistSP" + i + "' onclick='rmCloser.rmtrEvaluate(this.id)'>Swap Pages</button>";
+				rmtrButtonSpan.innerHTML += "<button id='rmCloserRMassistCo" + i + "' onclick='rmCloser.rmtrEvaluate(this.id)'>Contest</button>";
+			}
+			rmtrButtonSpan.innerHTML += "<button id='rmCloserRMassistRe" + i + "' onclick='rmCloser.rmtrEvaluate(this.id)'>Remove</button><br><span id='rmCloserRMassistHiddenSpan" + i + "'></span><br><hr><br>";
+			moveLinks[i].parentElement.insertBefore(rmtrButtonSpan,moveLinks[i].nextElementSibling);
+		}
 	}
 });
 
@@ -554,4 +581,104 @@ rmCloser.notifyEvaluate = function(e) {
 		});
 	}
 };
+
+rmCloser.rmtrEvaluate = function rmCloserRMTREvaluate(id) {
+	var type = id.slice(16,18);
+	var number = id.slice(18,id.length);
+	
+	var rmtrPage = new Morebits.wiki.page('Wikipedia:Requested moves/Technical requests', 'Closing technical request');
+	rmtrPage.load(function(rmtrPage) {
+		var text = rmtrPage.getPageText();
+
+		var rmAssistList = text.match(/\* {{RMassist\/core.*}}/g);
+		var rmAssistToFind = rmAssistList[number];
+		var currentTitle = rmAssistToFind.match(/\| 1 = (.*) \| 2 =/)[1];
+		var destinationTitle = rmAssistToFind.match(/\| 2 = (.*) \| discuss =/)[1];
+		var rmtrReason = rmAssistToFind.match(/\| reason = (.*) \| sig =/)[1];
+		var requesterSig = rmAssistToFind.match(/\| sig = (.*) \| requester =/)[1];
+		var requester = rmAssistToFind.match(/\| requester = (.*)}}/)[1];
+		var rmAssistToFindEscaped = rmAssistToFind.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+		var rmAssistToFindRegex = new RegExp(rmAssistToFindEscaped + '(\\n\|.)*?(====\|\\* {{RMassist\\/core)');
+		if(text.match(rmAssistToFindRegex) == null){
+			rmAssistToFindRegex = new RegExp(rmAssistToFindEscaped + '(\\n\|.)*');
+		}
+		var replacementString = text.match(rmAssistToFindRegex)[2]
+		if(replacementString == undefined){
+			replacementString = "";
+			var rmAssistToFindFull = text.match(rmAssistToFindRegex);
+			rmAssistToFindFull = rmAssistToFindFull[0];
+		} else{
+			var rmAssistToFindFull = text.match(rmAssistToFindRegex);
+			rmAssistToFindFull = rmAssistToFindFull[0].slice(0,-(replacementString.length+1));
+		}
+		var rmAssistToFindFullTrimmed = rmAssistToFindFull.trim();
+		
+		var temporaryText = text.replace('\n' + rmAssistToFindFullTrimmed,"");
+		if(temporaryText == text){
+			text = text.replace(rmAssistToFind,"");
+		} else{
+			text = temporaryText;
+		}
+		
+		if(type == "MD"){
+			document.getElementById('rmCloserRMassistHiddenSpan' + number).innerHTML = "";
+			
+			rmtrPage.setPageText(text);
+			rmtrPage.setEditSummary('Closing request' + rmCloser.advert);
+			
+			var pageToMove = new Morebits.wiki.page(currentTitle, 'Moving ' + currentTitle + ' to ' + destinationTitle + '.');
+			pageToMove.setMoveDestination(destinationTitle);
+			pageToMove.setMoveSubpages(true);
+			pageToMove.setMoveTalkPage(true);
+			pageToMove.setEditSummary('[[Special:Permalink/' + rmtrPage.getCurrentID() + '|Requested]] by ' + requester + ' at  [[WP:RM/TR]]: ' + rmtrReason + rmCloser.advert);
+			pageToMove.move(rmtrPage.save(location.reload()));
+		} else if(type == "SP"){//Swap pages
+			document.getElementById('rmCloserRMassistHiddenSpan' + number).innerHTML = "";
+			console.log(text);
+			//rmtrPage.setPageText(text);
+			//rmtrPage.setEditSummary('Closing request' + rmCloser.advert);
+			//rmtrPage.save(location.reload());
+		} else if(type == "Di"){
+			document.getElementById('rmCloserRMassistHiddenSpan' + number).innerHTML = "";
+			
+			rmtrPage.setPageText(text);
+			rmtrPage.setEditSummary('Discussing request' + rmCloser.advert);
+			
+			rmCloser.talktitle = mw.Title.newFromText(currentTitle).getTalkPage().toText();
+			var talkpage = new Morebits.wiki.page(rmCloser.talktitle, 'Creating requested move');
+			talkpage.load(function(talkpage) {
+				var rmPageText = talkpage.getPageText();
+				
+				rmPageText += "\n\n{{subst:Requested move|" + destinationTitle + "|reason=" + rmtrReason + " " + requesterSig + "\n:<small>This is a contested technical request ([[Special:Permalink/" + rmtrPage.getCurrentID() + "|permalink]]).</small>}}";
+				
+				talkpage.setPageText(rmPageText);
+				talkpage.setEditSummary('Creating requested move from technical request' + rmCloser.advert);
+				talkpage.save(rmtrPage.save(window.location = mw.util.getUrl(rmCloser.talktitle);));
+			});
+		} else if(type == "Re"){
+			document.getElementById('rmCloserRMassistHiddenSpan' + number).innerHTML = "<button id='rmCloserWithdrawn'>Withdrawn</button><button id='rmCloserAlreadyDone'>Already done</button>";
+			$('#rmCloserWithdrawn').click(function(){
+				
+				rmtrPage.setPageText(text);
+				rmtrPage.setEditSummary('Removing withdrawn request' + rmCloser.advert);
+				rmtrPage.save(location.reload());
+			});
+			$('#rmCloserAlreadyDone').click(function(){
+				
+				rmtrPage.setPageText(text);
+				rmtrPage.setEditSummary('Removing completed request' + rmCloser.advert);
+				rmtrPage.save(location.reload());
+			});
+		} else if(type == "Co"){
+			document.getElementById('rmCloserRMassistHiddenSpan' + number).innerHTML = "**{{ping|" + requester + "}} <input id='rmCloserContestReason' placeholder='Contest reason' oninput='if(this.value.length>20){this.size=this.value.length} else{this.size=20}'/> ~~~~ <button id='rmCloserSubmitContestReason'>Submit</button><br>";
+			$('#rmCloserSubmitContestReason').click(function(){
+				text = text.replace("==== Contested technical requests ====","$&\n" + rmAssistToFindFullTrimmed + "\n**{{ping|" + requester + "}} " + document.getElementById('rmCloserContestReason').value + " ~~~~");
+				
+				rmtrPage.setPageText(text);
+				rmtrPage.setEditSummary('Contesting request' + rmCloser.advert);
+				rmtrPage.save(location.reload());
+			});
+		}
+	});
+}
 //</nowiki>
