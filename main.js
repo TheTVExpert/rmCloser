@@ -173,8 +173,9 @@ rmCloser.evaluate = function(e) {
 		}
 		
 		var multiMove = false;
+		var moveSectionPlain = moveSection.slice(3,-3);
 		
-		var date = '|date=' + moveSection.slice(18,34);
+		var date = '|date=' + moveSection.slice(15);
 		var from = '';
 		if(result == "moved"){
 			from = '|from=' + rmCloser.title;
@@ -189,7 +190,7 @@ rmCloser.evaluate = function(e) {
 				destination = destination[1];
 			}
 		}
-		var moveSectionPlain = moveSection.slice(3,-3);
+		
 		var link = '|link=Special:Permalink/' + talkpage.getCurrentID() + '#' + moveSectionPlain;
 		
 		var archives = text.match(/{{[Aa]rchives/);
@@ -228,8 +229,8 @@ rmCloser.evaluate = function(e) {
 				}
 				
 				if(curr != null && dest != null){
-					otherPages.push(curr[1]);
-					otherDestinations.push(dest[1]);
+					otherPages.push(curr[1].trim());
+					otherDestinations.push(dest[1].trim());
 				}
 			}
 			
@@ -270,7 +271,7 @@ rmCloser.evaluate = function(e) {
 			if(result == "moved"){
 				var waitInterval = setInterval(function(){
 					if(pagesLeft == 0){
-						rmCloser.movePages(rmCloser.title,destination,otherPages,otherDestinations);
+						rmCloser.movePages(rmCloser.title,destination,otherPages,otherDestinations,moveSectionPlain);
 						clearInterval(waitInterval);
 					}
 				}, 500);
@@ -279,15 +280,21 @@ rmCloser.evaluate = function(e) {
 			}
 		} else if(result == "moved"){
 			var emptyArray = [];
-			rmCloser.movePages(rmCloser.title,destination,emptyArray,emptyArray);
+			rmCloser.movePages(rmCloser.title,destination,emptyArray,emptyArray,moveSectionPlain);
 		} else{
 			setTimeout(function(){ location.reload() }, 2000);	
 		}
 	});
 };
 
-rmCloser.movePages = function rmCloserMovePages(curr1,dest1,currList,destList){
+rmCloser.movePages = function rmCloserMovePages(curr1,dest1,currList,destList,sectionTitle){
 	var numberToRemove = currList.length+1;
+	
+	rmCloser.talktitle = mw.Title.newFromText(Morebits.pageNameNorm).getTalkPage().toText();
+	var pageAndSection = rmCloser.talktitle + "#" + sectionTitle;
+	var moveSummary = 'Moved per [[' + pageAndSection + ']]';
+	var rmtrReason = 'Per [[' + pageAndSection + ']].';
+	
 	var form = new Morebits.quickForm();
 	
 	form.append({
@@ -306,7 +313,7 @@ rmCloser.movePages = function rmCloserMovePages(curr1,dest1,currList,destList){
 		className: 'rmCloserMovePages' + curr1,
 		label: 'Move directly',
 		event: function() {
-			rmCloser.directMove(curr1,dest1,false);
+			rmCloser.directMove(curr1,dest1,false,moveSummary);
 			for(var i=0; i<document.getElementsByClassName('rmCloserMovePages' + curr1).length; i++){
 				document.getElementsByClassName('rmCloserMovePages' + curr1)[i].style.display = 'none';
 			}
@@ -320,7 +327,7 @@ rmCloser.movePages = function rmCloserMovePages(curr1,dest1,currList,destList){
 			className: 'rmCloserMovePages' + curr1,
 			label: 'Submit technical request',
 			event: function() {
-				rmCloser.submitRMTR(curr1,dest1);
+				rmCloser.submitRMTR(curr1,dest1,rmtrReason);
 				for(var i=0; i<document.getElementsByClassName('rmCloserMovePages' + curr1).length; i++){
 					document.getElementsByClassName('rmCloserMovePages' + curr1)[i].style.display = 'none';
 				}
@@ -333,7 +340,7 @@ rmCloser.movePages = function rmCloserMovePages(curr1,dest1,currList,destList){
 			className: 'rmCloserMovePages' + curr1,
 			label: 'Move directly without leaving a redirect',
 			event: function() {
-				rmCloser.directMove(curr1,dest1,true);
+				rmCloser.directMove(curr1,dest1,true,moveSummary);
 				for(var i=0; i<document.getElementsByClassName('rmCloserMovePages' + curr1).length; i++){
 					document.getElementsByClassName('rmCloserMovePages' + curr1)[i].style.display = 'none';
 				}
@@ -343,12 +350,55 @@ rmCloser.movePages = function rmCloserMovePages(curr1,dest1,currList,destList){
 	}
 	
 	for(var i=0; i<currList.length; i++){
-		form.append({ type: 'div', className: 'rmCloserMovePages' + currList[i], label: currList[i] + ' → ' + destList[i] });
-		form.append({ type: 'button', className: 'rmCloserMovePages' + currList[i], name: currList[i], extra: destList[i], label: 'Move directly', event: function() { rmCloser.directMove(this.name,this.extra,false); for(var j=0; j<document.getElementsByClassName('rmCloserMovePages' + this.name).length; j++){ document.getElementsByClassName('rmCloserMovePages' + this.name)[j].style.display = 'none'; } numberToRemove--; } });
+		form.append({
+			type: 'div',
+			className: 'rmCloserMovePages' + currList[i],
+			label: currList[i] + ' → ' + destList[i]
+		});
+		form.append({
+			type: 'button',
+			className: 'rmCloserMovePages' + currList[i],
+			name: currList[i],
+			extra: destList[i],
+			label: 'Move directly',
+			event: function() {
+				rmCloser.directMove(this.name,this.extra,false,moveSummary);
+				for(var j=0; j<document.getElementsByClassName('rmCloserMovePages' + this.name).length; j++){
+					document.getElementsByClassName('rmCloserMovePages' + this.name)[j].style.display = 'none';
+				}
+				numberToRemove--;
+			}
+		});
 		if(!Morebits.userIsInGroup('sysop') && !Morebits.userIsInGroup('extendedmover')){
-			form.append({ type: 'button', className: 'rmCloserMovePages' + currList[i], name: currList[i], extra: destList[i], label: 'Submit technical request', event: function() { rmCloser.submitRMTR(this.name,this.extra); for(var j=0; j<document.getElementsByClassName('rmCloserMovePages' + this.name).length; j++){ document.getElementsByClassName('rmCloserMovePages' + this.name)[j].style.display = 'none'; } numberToRemove--; } });
+			form.append({
+				type: 'button',
+				className: 'rmCloserMovePages' + currList[i],
+				name: currList[i],
+				extra: destList[i],
+				label: 'Submit technical request',
+				event: function() {
+					rmCloser.submitRMTR(this.name,this.extra,rmtrReason);
+					for(var j=0; j<document.getElementsByClassName('rmCloserMovePages' + this.name).length; j++){
+						document.getElementsByClassName('rmCloserMovePages' + this.name)[j].style.display = 'none';
+					}
+					numberToRemove--;
+				}
+			});
 		} else{
-			form.append({ type: 'button', className: 'rmCloserMovePages' + currList[i], name: currList[i], extra: destList[i], label: 'Move directly without leaving a redirect', event: function() { rmCloser.directMove(this.name,this.extra,true); for(var j=0; j<document.getElementsByClassName('rmCloserMovePages' + this.name).length; j++){ document.getElementsByClassName('rmCloserMovePages' + this.name)[j].style.display = 'none'; } numberToRemove--; } });
+			form.append({
+				type: 'button',
+				className: 'rmCloserMovePages' + currList[i],
+				name: currList[i],
+				extra: destList[i],
+				label: 'Move directly without leaving a redirect',
+				event: function() {
+					rmCloser.directMove(this.name,this.extra,true,moveSummary);
+					for(var j=0; j<document.getElementsByClassName('rmCloserMovePages' + this.name).length; j++){
+						document.getElementsByClassName('rmCloserMovePages' + this.name)[j].style.display = 'none';
+					}
+					numberToRemove--;
+				}
+			});
 		}
 	}
 
@@ -365,54 +415,22 @@ rmCloser.movePages = function rmCloserMovePages(curr1,dest1,currList,destList){
 	}, 500);
 };
 
-rmCloser.directMove = function rmCloserDirectMove(curr,dest,suppressRedirect) {
+rmCloser.directMove = function rmCloserDirectMove(curr,dest,suppressRedirect,editSummary) {
 	var pageToMove = new Morebits.wiki.page(curr, 'Moving ' + curr + ' to ' + dest + '.');
 	pageToMove.setMoveDestination(dest);
 	pageToMove.setMoveSubpages(true);
 	pageToMove.setMoveTalkPage(true);
 	pageToMove.setMoveSuppressRedirect(suppressRedirect);
-	var sections = document.getElementsByClassName("mw-headline");
-	var sectionArray = [];
-	for(var i=0; i<sections.length; i++){
-		sectionArray.push(sections[i].innerHTML);	
-	}
-	sectionArray.reverse();
-	var sectionToFind = /Requested move.*/;
-	var moveSection;
-	for(var i=0; i<sectionArray.length; i++){
-		if(sectionToFind.test(sectionArray[i])){
-			moveSection = sectionArray[i];
-			break;
-		}
-	}
-	rmCloser.talktitle = mw.Title.newFromText(Morebits.pageNameNorm).getTalkPage().toText();
-	var pageAndSection = rmCloser.talktitle + "#" + moveSection;
-	pageToMove.setEditSummary('Moved per [[' + pageAndSection + ']]' + rmCloser.advert);
+	pageToMove.setEditSummary(editSummary + rmCloser.advert);
 	pageToMove.move(Morebits.status.actionCompleted('Moved.'));
 };
 
-rmCloser.submitRMTR = function rmCloserSubmitRMTR(curr,dest) {
+rmCloser.submitRMTR = function rmCloserSubmitRMTR(curr,dest,reason) {
 	var rmtr = new Morebits.wiki.page('Wikipedia:Requested moves/Technical requests', 'Submitting request at WP:RM/TR');
 	rmtr.load(function(page) {
 		var text = rmtr.getPageText();
 		var textToFind = /---- and enter on a new line.* -->/;
-		var sections = document.getElementsByClassName("mw-headline");
-		var sectionArray = [];
-		for(var i=0; i<sections.length; i++){
-			sectionArray.push(sections[i].innerHTML);	
-		}
-		sectionArray.reverse();
-		var sectionToFind = /Requested move.*/;
-		var moveSection;
-		for(var i=0; i<sectionArray.length; i++){
-			if(sectionToFind.test(sectionArray[i])){
-				moveSection = sectionArray[i];
-				break;
-			}
-		}
-		rmCloser.talktitle = mw.Title.newFromText(Morebits.pageNameNorm).getTalkPage().toText();
-		var pageAndSection = rmCloser.talktitle + "#" + moveSection;
-		var rmtrText = '{{subst:RMassist|1=' + curr + '|2=' + dest + '|reason=Per [[' + pageAndSection + ']].}}';
+		var rmtrText = '{{subst:RMassist|1=' + curr + '|2=' + dest + '|reason=' + reason + '}}';
 		text = text.replace(textToFind, '$&\n' + rmtrText);
 		rmtr.setPageText(text);
 		rmtr.setEditSummary('Add request' + rmCloser.advert);
@@ -523,11 +541,11 @@ rmCloser.notifyEvaluate = function(e) {
 				sectionArray.push(sections[i].innerHTML);	
 			}
 			sectionArray.reverse();
-			var sectionToFind = /Requested move.*/;
+			var sectionToFind = /Requested move [0-9]{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4}/;
 			var moveSection;
 			for(var i=0; i<sectionArray.length; i++){
 				if(sectionToFind.test(sectionArray[i])){
-					moveSection = sectionArray[i];
+					moveSection = sectionArray[i].match(/Requested move [0-9]{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4}/)[0];
 					break;
 				}
 			}
