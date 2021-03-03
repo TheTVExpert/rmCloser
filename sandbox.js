@@ -202,7 +202,7 @@ rmCloser.evaluate = function(e) {
 		var multiMove = false;
 		var moveSectionPlain = moveSection.slice(3,-3);
 		
-		var date = '|date=' + moveSection.slice(15);
+		var date = '|date=' + moveSectionPlain.slice(15);
 		var from = '';
 		if(result == "moved"){
 			from = '|from=' + rmCloser.title;
