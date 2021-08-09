@@ -122,6 +122,7 @@ rmCloser.callback = function rmCloserCallback(e) {
 	rmCloser.Window.display();
 	
 	document.getElementsByName('customResult')[0].style.display = 'none';
+	document.getElementsByName('result')[0].required = true;
 };
 
 rmCloser.evaluate = function(e) {
@@ -136,10 +137,7 @@ rmCloser.evaluate = function(e) {
 	rmCloser.talktitle = title_obj.getTalkPage().toText();
 	
 	var result = rmCloser.params.result;
-	if(result == undefined){
-		var noResult = new Morebits.status('Error', 'No result selected; Reloading', 'error');
-		location.reload();
-	} else if(result == 'custom'){
+	if(result == 'custom'){
 		result = rmCloser.params.customResult;
 	}
 	
@@ -545,6 +543,8 @@ rmCloser.notify = function rmCloserNotify(e) {
 		var formResult = form.render();
 		Window.setContent(formResult);
 		Window.display();
+		
+		document.getElementsByName('wikiProject')[0].required = true;
 	}
 };
 
@@ -556,49 +556,46 @@ rmCloser.notifyEvaluate = function(e) {
 	Morebits.status.init(form);
 	
 	var wikiProjectToNotify = rmCloser.params.wikiProject;
-	if(wikiProjectToNotify == undefined){
-		var noWP = new Morebits.status('Error', 'No WikiProject selected', 'error');
-	} else{
-		var talkpage = new Morebits.wiki.page(wikiProjectToNotify, 'Notifying ' + wikiProjectToNotify + '.');
-		talkpage.setFollowRedirect(true);
-		talkpage.load(function(talkpage) {
-			var text = talkpage.getPageText();
+	
+	var talkpage = new Morebits.wiki.page(wikiProjectToNotify, 'Notifying ' + wikiProjectToNotify + '.');
+	talkpage.setFollowRedirect(true);
+	talkpage.load(function(talkpage) {
+		var text = talkpage.getPageText();
 
-			var sections = document.getElementsByClassName("mw-headline");
-			var sectionArray = [];
-			for(var i=0; i<sections.length; i++){
-				sectionArray.push(sections[i].innerHTML);	
+		var sections = document.getElementsByClassName("mw-headline");
+		var sectionArray = [];
+		for(var i=0; i<sections.length; i++){
+			sectionArray.push(sections[i].innerHTML);	
+		}
+		sectionArray.reverse();
+		var sectionToFind = /Requested move [0-9]{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4}/;
+		var moveSection;
+		for(var i=0; i<sectionArray.length; i++){
+			if(sectionToFind.test(sectionArray[i])){
+				moveSection = sectionArray[i].match(/Requested move [0-9]{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4}/)[0];
+				break;
 			}
-			sectionArray.reverse();
-			var sectionToFind = /Requested move [0-9]{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4}/;
-			var moveSection;
-			for(var i=0; i<sectionArray.length; i++){
-				if(sectionToFind.test(sectionArray[i])){
-					moveSection = sectionArray[i].match(/Requested move [0-9]{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4}/)[0];
-					break;
-				}
-			}
-			rmCloser.talktitle = mw.Title.newFromText(Morebits.pageNameNorm).getTalkPage().toText();
-			var pageAndSection = rmCloser.talktitle + "#" + moveSection;
+		}
+		rmCloser.talktitle = mw.Title.newFromText(Morebits.pageNameNorm).getTalkPage().toText();
+		var pageAndSection = rmCloser.talktitle + "#" + moveSection;
 			
-			if(text.match(pageAndSection) != null){
-				if(confirm("Selected WikiProject may have already been notified of the discussion. Do you wish to proceed?")){
-					text += "\n\n== Requested move at [[" + pageAndSection + "]] ==\n[[File:Information.svg|30px|left]] There is a requested move discussion at [[" + pageAndSection + "]] that may be of interest to members of this WikiProject. ~~~~";
-
-					talkpage.setPageText(text);
-					talkpage.setEditSummary('Notifying of requested move' + rmCloser.advert);
-					talkpage.save(Morebits.status.actionCompleted('Notified.'));
-				} else{
-					var cancelNotify = new Morebits.status('Error', 'Notification canceled', 'error');	
-				}
-			} else{
+		if(text.match(pageAndSection) != null){
+			if(confirm("Selected WikiProject may have already been notified of the discussion. Do you wish to proceed?")){
 				text += "\n\n== Requested move at [[" + pageAndSection + "]] ==\n[[File:Information.svg|30px|left]] There is a requested move discussion at [[" + pageAndSection + "]] that may be of interest to members of this WikiProject. ~~~~";
 
 				talkpage.setPageText(text);
 				talkpage.setEditSummary('Notifying of requested move' + rmCloser.advert);
-				talkpage.save(Morebits.status.actionCompleted('Notified.'));	
+				talkpage.save(Morebits.status.actionCompleted('Notified.'));
+			} else{
+				var cancelNotify = new Morebits.status('Error', 'Notification canceled', 'error');	
 			}
-		});
-	}
+		} else{
+			text += "\n\n== Requested move at [[" + pageAndSection + "]] ==\n[[File:Information.svg|30px|left]] There is a requested move discussion at [[" + pageAndSection + "]] that may be of interest to members of this WikiProject. ~~~~";
+
+			talkpage.setPageText(text);
+			talkpage.setEditSummary('Notifying of requested move' + rmCloser.advert);
+			talkpage.save(Morebits.status.actionCompleted('Notified.'));	
+		}
+	});
 };
 //</nowiki>
