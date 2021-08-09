@@ -149,6 +149,7 @@ rmCloser.callback = function rmCloserCallback(e) {
 	rmCloser.Window.display();
 	
 	document.getElementsByName('customResult')[0].style.display = 'none';
+	document.getElementsByName('result')[0].required = true;
 };
 
 rmCloser.evaluate = function(e) {
@@ -163,10 +164,7 @@ rmCloser.evaluate = function(e) {
 	rmCloser.talktitle = title_obj.getTalkPage().toText();
 	
 	var result = rmCloser.params.result;
-	if(result == undefined){
-		var noResult = new Morebits.status('Error', 'No result selected; Reloading', 'error');
-		location.reload();
-	} else if(result == 'custom'){
+	if(result == 'custom'){
 		result = rmCloser.params.customResult;
 	}
 	
