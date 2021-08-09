@@ -7,7 +7,14 @@ $.when(
 	mw.loader.using([ 'mediawiki.api', 'ext.gadget.morebits' ]),
 	$.ready
 ).then(function() {
-	if (document.getElementById("reqmovetag") !== null) {
+	var rmCategoryPresent = false;
+	var categories = document.getElementById("mw-normal-catlinks").children[1].children;
+	for(var i=0; i<categories.length; i++){
+		if(categories[i].innerText == "Requested moves"){
+			rmCategoryPresent = true;
+		}
+	}
+	if (document.getElementById("reqmovetag") !== null && Morebits.pageNameNorm.indexOf("alk:") !== -1 && rmCategoryPresent && !document.getElementById("wikiPreview") && mw.config.get('wgDiffOldId') == null) {
 		document.getElementById("reqmovetag").innerHTML = "<button id='rmCloserClose'>Close</button><button id='rmCloserRelist'>Relist</button><button id='rmCloserConfirm' style='display:none'>Confirm relist</button><button id='rmCloserCancel' style='display:none'>Cancel relist</button><button id='rmCloserNotify'>Notify WikiProjects</button>";
 		$('#rmCloserClose').click(rmCloser.callback);
 		$('#rmCloserRelist').click(rmCloser.confirmRelist);
@@ -50,6 +57,7 @@ rmCloser.confirmRelist = function rmCloserConfirmRelist(e) {
 	document.getElementById("rmCloserCancel").style.display = "inline";
 	document.getElementById("rmCloserClose").style.display = "none";
 	document.getElementById("rmCloserRelist").style.display = "none";
+	document.getElementById("rmCloserNotify").style.display = "none";
 };
 
 rmCloser.cancelRelist = function rmCloserCancelRelist(e) {
@@ -58,6 +66,7 @@ rmCloser.cancelRelist = function rmCloserCancelRelist(e) {
 	document.getElementById("rmCloserCancel").style.display = "none";
 	document.getElementById("rmCloserClose").style.display = "inline";
 	document.getElementById("rmCloserRelist").style.display = "inline";
+	document.getElementById("rmCloserNotify").style.display = "inline";
 };
 
 rmCloser.advert = ' using [[User:TheTVExpert/rmCloser|rmCloser]]';
@@ -70,15 +79,16 @@ rmCloser.callback = function rmCloserCallback(e) {
 	rmCloser.Window.setScriptName('rmCloser');
 	rmCloser.Window.addFooterLink('RM Closing instruction', 'WP:RMCI');
 	rmCloser.Window.addFooterLink('Script documentation', 'User:TheTVExpert/rmCloser');
+	rmCloser.Window.addFooterLink('Give feedback', 'User talk:TheTVExpert/rmCloser');
 
 	var form = new Morebits.quickForm(rmCloser.evaluate);
 	
-	form.append({
-		type: 'div',
+	var resultField = form.append({
+		type: 'field',
 		label: 'Result'
 	});
 
-	form.append({
+	resultField.append({
 		type: 'radio',
 		name: 'result',
 		list: [
@@ -117,11 +127,21 @@ rmCloser.callback = function rmCloserCallback(e) {
 		]
 	});
 	
-	form.append({
+	resultField.append({
 		type: 'input',
 		name: 'customResult'
 	});
 
+	var closingCommentField = form.append({
+		type: 'field',
+		label: 'Closing comment'
+	});
+	
+	closingCommentField.append({
+		type: 'textarea',
+		name: 'closingComment'
+	});
+	
 	form.append({ type: 'submit', label: 'Submit' });
 
 	var formResult = form.render();
@@ -143,8 +163,16 @@ rmCloser.evaluate = function(e) {
 	rmCloser.talktitle = title_obj.getTalkPage().toText();
 	
 	var result = rmCloser.params.result;
-	if(result == 'custom'){
+	if(result == undefined){
+		var noResult = new Morebits.status('Error', 'No result selected; Reloading', 'error');
+		location.reload();
+	} else if(result == 'custom'){
 		result = rmCloser.params.customResult;
+	}
+	
+	var closingComment = rmCloser.params.closingComment;
+	if(closingComment != ""){
+		closingComment = ' ' + closingComment;
 	}
 
 	var talkpage = new Morebits.wiki.page(rmCloser.talktitle, 'Closing move.');
@@ -179,7 +207,7 @@ rmCloser.evaluate = function(e) {
 		} else{
 			userGroupText = "|nac=y";
 		}
-		text = text.replace(/{{[Rr]equested move\/dated\|.*\n?.*}}/, "{{subst:RM top|'''" + result + ".'''"+ userGroupText +"}}");
+		text = text.replace(/{{[Rr]equested move\/dated\|.*\n?.*}}/, "{{subst:RM top|'''" + result + ".'''" + closingComment + userGroupText +"}}");
 		
 		var sections = text.match(/^(==)[^=].+\1/gm);
 		var sectionToFind = /== Requested move.*==/;
@@ -519,6 +547,7 @@ rmCloser.notify = function rmCloserNotify(e) {
 		Window.setTitle( "Notify WikiProjects about requested move" );
 		Window.setScriptName('rmCloser');
 		Window.addFooterLink('Script documentation', 'User:TheTVExpert/rmCloser');
+		Window.addFooterLink('Give feedback', 'User talk:TheTVExpert/rmCloser');
 
 		var form = new Morebits.quickForm(rmCloser.notifyEvaluate);
 
