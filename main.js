@@ -216,6 +216,9 @@ rmCloser.evaluate = function(e) {
 				destination = destination[1];
 			}
 		}
+		if(destination == "?"){
+			destination = "";
+		}
 		
 		var link = '|link=Special:Permalink/' + talkpage.getCurrentID() + '#' + moveSectionPlain;
 		
@@ -273,6 +276,9 @@ rmCloser.evaluate = function(e) {
 					var otherFrom = '';
 					if(result == "moved"){
 						otherFrom = '|from=' + OMcurr;
+					}
+					if(OMdest == "?"){
+						OMdest == "";
 					}
 					var otherDestination = '|destination=' + OMdest;
 					var otherArchives = otherText.match(/{{[Aa]rchives/);
@@ -578,7 +584,9 @@ rmCloser.notifyEvaluate = function(e) {
 		}
 		rmCloser.talktitle = mw.Title.newFromText(Morebits.pageNameNorm).getTalkPage().toText();
 		var pageAndSection = rmCloser.talktitle + "#" + moveSection;
-			
+		
+		var notified;
+		
 		if(text.match(pageAndSection) != null){
 			if(confirm("Selected WikiProject may have already been notified of the discussion. Do you wish to proceed?")){
 				text += "\n\n== Requested move at [[" + pageAndSection + "]] ==\n[[File:Information.svg|30px|left]] There is a requested move discussion at [[" + pageAndSection + "]] that may be of interest to members of this WikiProject. ~~~~";
@@ -586,15 +594,45 @@ rmCloser.notifyEvaluate = function(e) {
 				talkpage.setPageText(text);
 				talkpage.setEditSummary('Notifying of requested move' + rmCloser.advert);
 				talkpage.save(Morebits.status.actionCompleted('Notified.'));
+				notified = true;
 			} else{
-				var cancelNotify = new Morebits.status('Error', 'Notification canceled', 'error');	
+				var cancelNotify = new Morebits.status('Error', 'Notification canceled', 'error');
+				notified = false;
 			}
 		} else{
 			text += "\n\n== Requested move at [[" + pageAndSection + "]] ==\n[[File:Information.svg|30px|left]] There is a requested move discussion at [[" + pageAndSection + "]] that may be of interest to members of this WikiProject. ~~~~";
 
 			talkpage.setPageText(text);
 			talkpage.setEditSummary('Notifying of requested move' + rmCloser.advert);
-			talkpage.save(Morebits.status.actionCompleted('Notified.'));	
+			talkpage.save(Morebits.status.actionCompleted('Notified.'));
+			notified = true;
+		}
+		
+		if(notified){
+			var discussionPage = new Morebits.wiki.page(rmCloser.talktitle, 'Adding note about notification to requested move');
+			discussionPage.load(function(discussionPage) {
+				var discussionPageText = discussionPage.getPageText();
+				
+				var sectionList = discussionPageText.match(/^(==)[^=].+\1/gm);
+				var sectionToFindWikitext = /== Requested move.*==/;
+				sectionList.reverse();
+				if(sectionToFindWikitext.test(sectionList[0])){
+					discussionPageText+='\n:<small>Note: [[' + wikiProjectToNotify + '|' + wikiProjectToNotify.slice(15) + ']] has been notified of this discussion. ~~~~</small>';
+				} else{
+					var i;
+					for(i=0;i<sectionList.length;i++){
+						if(sectionToFindWikitext.test(sectionList[i])){
+							discussionPageText = discussionPageText.replace(sectionList[i-1], ':<small>Note: [[' + wikiProjectToNotify + '|' + wikiProjectToNotify.slice(15) + ']] has been notified of this discussion. ~~~~</small>\n\n' + sectionList[i-1]);
+							break;
+						}
+					}
+				}
+		
+				discussionPage.setPageText(discussionPageText);
+				discussionPage.setEditSummary('Added note about notifying WikiProject' + rmCloser.advert);
+				discussionPage.save(Morebits.status.actionCompleted('Note added.'));
+				setTimeout(function(){ location.reload() }, 2000);
+			});
 		}
 	});
 };
