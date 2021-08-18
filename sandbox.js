@@ -656,7 +656,7 @@ rmCloser.notifyEvaluate = function(e) {
 				}
 		
 				discussionPage.setPageText(discussionPageText);
-				discussionPage.setEditSummary('Added note about notifying WikiProject' + rmCloser.advert);
+				discussionPage.setEditSummary('Added note about notifying WikiProject about requested move' + rmCloser.advert);
 				discussionPage.save(Morebits.status.actionCompleted('Note added.'));
 				setTimeout(function(){ location.reload() }, 2000);
 			});
