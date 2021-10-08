@@ -149,7 +149,7 @@ rmCloser.evaluate = function(e) {
 	var talkpage = new Morebits.wiki.page(rmCloser.talktitle, 'Closing move.');
 	talkpage.load(function(talkpage) {
 		var text = talkpage.getPageText();
-		var template = text.match(/{{[Rr]equested move\/dated\|.*\n?.*}}/)[0];
+		var template = text.match(/{{[Rr]equested move\/dated\|.*\n?[^\[]*}}/)[0];
 
 		var templateFound = false;
 		var numberOfMoves = 0;
@@ -178,7 +178,7 @@ rmCloser.evaluate = function(e) {
 		} else{
 			userGroupText = "|nac=y";
 		}
-		text = text.replace(/{{[Rr]equested move\/dated\|.*\n?.*}}/, "{{subst:RM top|'''" + result + ".'''" + closingComment + userGroupText +"}}");
+		text = text.replace(/{{[Rr]equested move\/dated\|.*\n?[^\[]*}}/, "{{subst:RM top|'''" + result + ".'''" + closingComment + userGroupText +"}}");
 		
 		var sections = text.match(/^(==)[^=].+\1/gm);
 		var sectionToFind = /== Requested move.*==/;
