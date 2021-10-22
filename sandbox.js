@@ -171,6 +171,8 @@ rmCloser.evaluate = function(e) {
 	var closingComment = rmCloser.params.closingComment;
 	if(closingComment != ""){
 		closingComment = ' ' + closingComment;
+		closingComment = closingComment.replace(/\|/g, "{{!}}");
+		closingComment = closingComment.replace(/=/g, "{{=}}");
 	}
 
 	var talkpage = new Morebits.wiki.page(rmCloser.talktitle, 'Closing move.');
