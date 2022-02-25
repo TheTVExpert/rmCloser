@@ -8,10 +8,12 @@ $.when(
 	$.ready
 ).then(function() {
 	var rmCategoryPresent = false;
-	var categories = document.getElementById("mw-normal-catlinks").children[1].children;
-	for(var i=0; i<categories.length; i++){
-		if(categories[i].innerText == "Requested moves"){
-			rmCategoryPresent = true;
+	if (document.getElementById("mw-normal-catlinks")){
+		var categories = document.getElementById("mw-normal-catlinks").children[1].children;
+		for(var i=0; i<categories.length; i++){
+			if(categories[i].innerText == "Requested moves"){
+				rmCategoryPresent = true;
+			}
 		}
 	}
 	if (document.getElementById("reqmovetag") !== null && Morebits.pageNameNorm.indexOf("alk:") !== -1 && rmCategoryPresent && !document.getElementById("wikiPreview") && mw.config.get('wgDiffOldId') == null) {
