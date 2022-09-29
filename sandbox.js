@@ -17,7 +17,7 @@ $.when(
 		}
 	}
 	if (document.getElementById("reqmovetag") !== null && Morebits.pageNameNorm.indexOf("alk:") !== -1 && rmCategoryPresent && !document.getElementById("wikiPreview") && mw.config.get('wgDiffOldId') == null) {
-		document.getElementById("reqmovetag").innerHTML = "<button id='rmCloserClose'>Close</button><button id='rmCloserRelist'>Relist</button><button id='rmCloserConfirm' style='display:none'>Confirm relist</button><button id='rmCloserCancel' style='display:none'>Cancel relist</button><button id='rmCloserNotify'>Notify WikiProjects</button>";
+		document.getElementById("reqmovetag").innerHTML = "<button id='rmCloserClose'>Close</button><button id='rmCloserRelist'>Relist</button><button id='rmCloserNotify'>Notify WikiProjects</button><span id='rmCloserRelistOptions' style='display:none'><input id='rmCloserRelistComment' placeholder='Relisting comment' oninput='if(this.value.length>20){this.size=this.value.length} else{this.size=20}'/><br><button id='rmCloserConfirm'>Confirm relist</button><button id='rmCloserCancel'>Cancel relist</button></span>";
 		$('#rmCloserClose').click(rmCloser.callback);
 		$('#rmCloserRelist').click(rmCloser.confirmRelist);
 		$('#rmCloserConfirm').click(rmCloser.relist);
@@ -55,8 +55,7 @@ $.when(
 
 rmCloser.confirmRelist = function rmCloserConfirmRelist(e) {
 	if (e) e.preventDefault();
-	document.getElementById("rmCloserConfirm").style.display = "inline";
-	document.getElementById("rmCloserCancel").style.display = "inline";
+	document.getElementById("rmCloserRelistOptions").style.display = "inline";
 	document.getElementById("rmCloserClose").style.display = "none";
 	document.getElementById("rmCloserRelist").style.display = "none";
 	document.getElementById("rmCloserNotify").style.display = "none";
@@ -64,8 +63,7 @@ rmCloser.confirmRelist = function rmCloserConfirmRelist(e) {
 
 rmCloser.cancelRelist = function rmCloserCancelRelist(e) {
 	if (e) e.preventDefault();
-	document.getElementById("rmCloserConfirm").style.display = "none";
-	document.getElementById("rmCloserCancel").style.display = "none";
+	document.getElementById("rmCloserRelistOptions").style.display = "none";
 	document.getElementById("rmCloserClose").style.display = "inline";
 	document.getElementById("rmCloserRelist").style.display = "inline";
 	document.getElementById("rmCloserNotify").style.display = "inline";
@@ -506,6 +504,9 @@ rmCloser.relist = function rmCloserRelist(e) {
 	var title_obj = mw.Title.newFromText(Morebits.pageNameNorm);
 	rmCloser.talktitle = title_obj.getTalkPage().toText();
 	var talkpage = new Morebits.wiki.page(rmCloser.talktitle, 'Relisting.');
+	
+	var relistingComment = document.getElementById('rmCloserRelistComment').value;
+	
 	talkpage.load(function(talkpage) {
 		var text = talkpage.getPageText();
 
@@ -526,7 +527,25 @@ rmCloser.relist = function rmCloserRelist(e) {
 				}
 			}
 		}
+		
 		text = text.replace(sig, sig + " {{subst:relisting}}");
+		
+		if(relistingComment != ''){
+			var sectionList = text.match(/^(==)[^=].+\1/gm);
+			var sectionToFindWikitext = /== Requested move.*==/;
+			sectionList.reverse();
+			if(sectionToFindWikitext.test(sectionList[0])){
+				text+='\n:<small>\'\'\'Relisting comment\'\'\': ' + relistingComment + ' ~~~~</small>';
+			} else{
+				var i;
+				for(i=0;i<sectionList.length;i++){
+					if(sectionToFindWikitext.test(sectionList[i])){
+						text = text.replace(sectionList[i-1], ':<small>\'\'\'Relisting comment\'\'\': ' + relistingComment + ' ~~~~</small>\n\n' + sectionList[i-1]);
+						break;
+					}
+				}
+			}
+		}
 		
 		talkpage.setPageText(text);
 		talkpage.setEditSummary('Relisted requested move' + rmCloser.advert);
