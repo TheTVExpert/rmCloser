@@ -213,7 +213,7 @@ rmCloser.evaluate = function(e) {
 			multiMove = true;
 			destination = destination[1];
 		} else{
-			destination = template.match(/\|(.*)}}/);
+			destination = template.match(/\|(.*?)(?:\|.*)?}}/);
 			if(destination != null){
 				destination = destination[1];
 			}
@@ -463,7 +463,7 @@ rmCloser.submitRMTR = function rmCloserSubmitRMTR(curr,dest,reason) {
 	var rmtr = new Morebits.wiki.page('Wikipedia:Requested moves/Technical requests', 'Submitting request at WP:RM/TR');
 	rmtr.load(function(page) {
 		var text = rmtr.getPageText();
-		var textToFind = /---- and enter on a new line.* -->/;
+		var textToFind = /and enter on a new line.* -->/;
 		var rmtrText = '{{subst:RMassist|1=' + curr + '|2=' + dest + '|reason=' + reason + '}}';
 		text = text.replace(textToFind, '$&\n' + rmtrText);
 		rmtr.setPageText(text);
@@ -501,7 +501,7 @@ rmCloser.relist = function rmCloserRelist(e) {
 			}
 		}
 		
-		text = text.replace(sig, sig + " {{subst:relisting}}");
+		text = text.replace(sig, sig + " {{subst:RM relist}}");
 		
 		if(relistingComment != ''){
 			var sectionList = text.match(/^(==)[^=].+\1/gm);
