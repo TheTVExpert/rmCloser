@@ -7,16 +7,7 @@ $.when(
 	mw.loader.using([ 'mediawiki.api', 'ext.gadget.morebits' ]),
 	$.ready
 ).then(function() {
-	var rmCategoryPresent = false;
-	if (document.getElementById("mw-normal-catlinks")){
-		var categories = document.getElementById("mw-normal-catlinks").children[1].children;
-		for(var i=0; i<categories.length; i++){
-			if(categories[i].innerText == "Requested moves"){
-				rmCategoryPresent = true;
-			}
-		}
-	}
-	if (document.getElementById("reqmovetag") !== null && Morebits.pageNameNorm.indexOf("alk:") !== -1 && rmCategoryPresent && !document.getElementById("wikiPreview") && mw.config.get('wgDiffOldId') == null) {
+	if (document.getElementById("reqmovetag") !== null && Morebits.pageNameNorm.indexOf("alk:") !== -1 && mw.config.get('wgCategories').includes('Requested moves') && !document.getElementById("wikiPreview") && mw.config.get('wgDiffOldId') == null) {
 		document.getElementById("reqmovetag").innerHTML = "<button id='rmCloserClose'>Close</button><button id='rmCloserRelist'>Relist</button><button id='rmCloserNotify'>Notify WikiProjects</button><span id='rmCloserRelistOptions' style='display:none'><input id='rmCloserRelistComment' placeholder='Relisting comment' oninput='if(this.value.length>20){this.size=this.value.length} else{this.size=20}'/><br><button id='rmCloserConfirm'>Confirm relist</button><button id='rmCloserCancel'>Cancel relist</button></span>";
 		$('#rmCloserClose').click(rmCloser.callback);
 		$('#rmCloserRelist').click(rmCloser.confirmRelist);
