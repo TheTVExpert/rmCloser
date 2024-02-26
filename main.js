@@ -606,7 +606,7 @@ rmCloser.notifyEvaluate = function(e) {
 				text += "\n\n== Requested move at [[" + pageAndSection + "]] ==\n[[File:Information.svg|30px|left]] There is a requested move discussion at [[" + pageAndSection + "]] that may be of interest to members of this WikiProject. ~~~~";
 
 				talkpage.setPageText(text);
-				talkpage.setEditSummary('Notifying of requested move [["' + pageAndSection + '"]]' + rmCloser.advert);
+				talkpage.setEditSummary('Notifying of [[' + pageAndSection + '\|requested move]]' + rmCloser.advert);
 				talkpage.save(Morebits.status.actionCompleted('Notified.'));
 				notified = true;
 			} else{
@@ -617,7 +617,7 @@ rmCloser.notifyEvaluate = function(e) {
 			text += "\n\n== Requested move at [[" + pageAndSection + "]] ==\n[[File:Information.svg|30px|left]] There is a requested move discussion at [[" + pageAndSection + "]] that may be of interest to members of this WikiProject. ~~~~";
 
 			talkpage.setPageText(text);
-			talkpage.setEditSummary('Notifying of requested move' + rmCloser.advert);
+			talkpage.setEditSummary('Notifying of [[' + pageAndSection + '\|requested move]]' + rmCloser.advert);
 			talkpage.save(Morebits.status.actionCompleted('Notified.'));
 			notified = true;
 		}
