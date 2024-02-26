@@ -454,9 +454,9 @@ rmCloser.submitRMTR = function rmCloserSubmitRMTR(curr,dest,reason) {
 	var rmtr = new Morebits.wiki.page('Wikipedia:Requested moves/Technical requests', 'Submitting request at WP:RM/TR');
 	rmtr.load(function(page) {
 		var text = rmtr.getPageText();
-		var textToFind = /and enter on a new line.* -->/;
+		var textToFind = /\n{1,}(==== ?Requests to revert undiscussed moves ?====)/i;
 		var rmtrText = '{{subst:RMassist|1=' + curr + '|2=' + dest + '|reason=' + reason + '}}';
-		text = text.replace(textToFind, '$&\n' + rmtrText);
+		text = text.replace(textToFind, '\n' + rmtrText + '\n\n$1');
 		rmtr.setPageText(text);
 		rmtr.setEditSummary('Add request' + rmCloser.advert);
 		rmtr.save(Morebits.status.actionCompleted('Requested.'));
