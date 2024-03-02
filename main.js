@@ -7,8 +7,8 @@ $.when(
 	mw.loader.using([ 'mediawiki.api', 'ext.gadget.morebits' ]),
 	$.ready
 ).then(function() {
-	if (document.getElementById("reqmovetag") !== null && Morebits.pageNameNorm.indexOf("alk:") !== -1 && mw.config.get('wgCategories').includes('Requested moves') && !document.getElementById("wikiPreview") && mw.config.get('wgDiffOldId') == null) {
-		document.getElementById("reqmovetag").innerHTML = "<button id='rmCloserClose'>Close</button><button id='rmCloserRelist'>Relist</button><button id='rmCloserNotify'>Notify WikiProjects</button><span id='rmCloserRelistOptions' style='display:none'><input id='rmCloserRelistComment' placeholder='Relisting comment' oninput='if(this.value.length>20){this.size=this.value.length} else{this.size=20}'/><br><button id='rmCloserConfirm'>Confirm relist</button><button id='rmCloserCancel'>Cancel relist</button></span>";
+	if (document.getElementById("requestedmovetag") !== null && Morebits.pageNameNorm.indexOf("alk:") !== -1 && mw.config.get('wgCategories').includes('Requested moves') && !document.getElementById("wikiPreview") && mw.config.get('wgDiffOldId') == null) {
+		document.getElementById("requestedmovetag").innerHTML = "<button id='rmCloserClose'>Close</button><button id='rmCloserRelist'>Relist</button><button id='rmCloserNotify'>Notify WikiProjects</button><span id='rmCloserRelistOptions' style='display:none'><input id='rmCloserRelistComment' placeholder='Relisting comment' oninput='if(this.value.length>20){this.size=this.value.length} else{this.size=20}'/><br><button id='rmCloserConfirm'>Confirm relist</button><button id='rmCloserCancel'>Cancel relist</button></span>";
 		$('#rmCloserClose').click(rmCloser.callback);
 		$('#rmCloserRelist').click(rmCloser.confirmRelist);
 		$('#rmCloserConfirm').click(rmCloser.relist);
@@ -514,7 +514,7 @@ rmCloser.relist = function rmCloserRelist(e) {
 		talkpage.setPageText(text);
 		talkpage.setEditSummary('Relisted requested move' + rmCloser.advert);
 		talkpage.save(Morebits.status.actionCompleted('Relisted.'));
-		document.getElementById("reqmovetag").innerHTML = "";
+		document.getElementById("requestedmovetag").innerHTML = "";
 		setTimeout(function(){ location.reload() }, 2000);
 	});
 };
