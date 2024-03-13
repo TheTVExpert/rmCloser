@@ -628,7 +628,7 @@ rmCloser.notifyEvaluate = function(wikiProjectsToNotify) {
 			
 			var notified;
 			
-			if(confirm("Selected WikiProject may have already been notified of the discussion. Do you wish to proceed?")){
+			if(confirm("\"" + wikiProjectToNotify + "\" may have already been notified of the discussion. Do you wish to proceed?")){
 				text += "\n\n== Requested move at [[" + pageAndSection + "]] ==\n[[File:Information.svg|30px|left]] There is a requested move discussion at [[" + pageAndSection + "]] that may be of interest to members of this WikiProject. ~~~~";
 
 				talkpage.setPageText(text);
@@ -646,7 +646,7 @@ rmCloser.notifyEvaluate = function(wikiProjectsToNotify) {
 			
 			wikiProjectCount++;
 
-			if (wikiProjectCount == wikiProjectsToNotify.length) {
+			if (wikiProjectCount == wikiProjectsToNotify.length && wikiProjectsNotified.length > 0) {
 				rmCloser.notifyListOnTalkPage(wikiProjectsNotified);
 			}
 		});
