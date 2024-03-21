@@ -147,19 +147,41 @@ rmCloser.evaluate = function(e) {
 		var templateFound = false;
 		var numberOfMoves = 0;
 		var line;
+		var templateIndex = -1;
+		var parsedDate;
+		var rmSection;
+		var nextSection = "";
 		var textToFind = text.split('\n');
 		for (var i = 0; i < textToFind.length; i++) {	
 			line = textToFind[i];
 			if(templateFound == false){
 				if(/{{[Rr]equested move\/dated/.test(line)){
 					templateFound = true;
+					templateIndex = i;
 				}
 			} else if(templateFound == true){
 				if (/ \(UTC\)/.test(line)){
+					parsedDate = line.match(/, ([0-9]{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4}) \(UTC\)/)[1];
 					break;
 				} else if(/→/.test(line)){
 					numberOfMoves++;
 				}
+			}
+		}
+
+		for (var i = templateIndex; i >= 0; i--) {
+			line = textToFind[i];
+			if (line.match(/^(==)[^=].+\1/)) {
+				rmSection = line.match(/^(==)[^=](.+)\1/)[2].trim();
+				break;
+			}
+		}
+
+		for (var i = templateIndex+1; i < textToFind.length; i++) {
+			line = textToFind[i];
+			if (line.match(/^(==)[^=].+\1/)) {
+				nextSection = line.match(/^(==)[^=].+\1/)[0];
+				break;
 			}
 		}
 		
@@ -172,29 +194,17 @@ rmCloser.evaluate = function(e) {
 			userGroupText = "|nac=y";
 		}
 		text = text.replace(/{{[Rr]equested move\/dated\|.*\n?[^\[]*}}/, "{{subst:RM top|'''" + result + ".'''" + closingComment + userGroupText +"}}");
-		
-		var sections = text.match(/^(==)[^=].+\1/gm);
-		var sectionToFind = /== Requested move.*==/;
-		sections.reverse();
-		var moveSection;
-		if(sectionToFind.test(sections[0])){
-			text+='\n{{subst:RM bottom}}';
-			moveSection = sections[0];
-		} else{
-			var i;
-			for(i=0;i<sections.length;i++){
-				if(sectionToFind.test(sections[i])){
-					text = text.replace(sections[i-1], '\n{{subst:RM bottom}}\n' + sections[i-1]);
-					moveSection = sections[i];
-					break;
-				}
-			}
+
+		if (nextSection.length == 0) {
+			text += '\n{{subst:RM bottom}}';
+		} else {
+			text = text.replace(nextSection, '{{subst:RM bottom}}\n\n' + nextSection);
 		}
 		
 		var multiMove = false;
-		var moveSectionPlain = moveSection.slice(3,-3);
+		var moveSectionPlain = rmSection;
 		
-		var date = '|date=' + moveSectionPlain.slice(15);
+		var date = '|date=' + parsedDate;
 		var from = '';
 		if(result == "moved"){
 			from = '|from=' + rmCloser.title;
@@ -477,12 +487,14 @@ rmCloser.relist = function rmCloserRelist(e) {
 		var templateFound = false;
 		var sig;
 		var line;
+		var templateIndex = -1;
 		var textToFind = text.split('\n');
 		for (var i = 0; i < textToFind.length; i++) {	
 			line = textToFind[i];
 			if(templateFound == false){
 				if(/{{[Rr]equested move\/dated/.test(line)){
 					templateFound = true;
+					templateIndex = i;
 				}
 			} else if(templateFound == true){
 				if (/ \(UTC\)/.test(line)){
@@ -495,19 +507,19 @@ rmCloser.relist = function rmCloserRelist(e) {
 		text = text.replace(sig, sig + " {{subst:RM relist}}");
 		
 		if(relistingComment != ''){
-			var sectionList = text.match(/^(==)[^=].+\1/gm);
-			var sectionToFindWikitext = /== Requested move.*==/;
-			sectionList.reverse();
-			if(sectionToFindWikitext.test(sectionList[0])){
-				text+='\n:<small>\'\'\'Relisting comment\'\'\': ' + relistingComment + ' ~~~~</small>';
-			} else{
-				var i;
-				for(i=0;i<sectionList.length;i++){
-					if(sectionToFindWikitext.test(sectionList[i])){
-						text = text.replace(sectionList[i-1], ':<small>\'\'\'Relisting comment\'\'\': ' + relistingComment + ' ~~~~</small>\n\n' + sectionList[i-1]);
-						break;
-					}
+			var nextSection = "";
+			for (var i = templateIndex+1; i < textToFind.length; i++) {
+				line = textToFind[i];
+				if (line.match(/^(==)[^=].+\1/)) {
+					nextSection = line.match(/^(==)[^=].+\1/)[0];
+					break;
 				}
+			}
+
+			if (nextSection.length == 0) {
+				text += '\n:<small>\'\'\'Relisting comment\'\'\': ' + relistingComment + ' ~~~~</small>';
+			} else {
+				text = text.replace(nextSection, ':<small>\'\'\'Relisting comment\'\'\': ' + relistingComment + ' ~~~~</small>\n\n' + nextSection);
 			}
 		}
 		
@@ -611,14 +623,45 @@ rmCloser.notifyCheck = function(e) {
 				}
 				wikiProjectCount++;
 				if (wikiProjectCount == wikiProjectsToNotify.length && uniqueWikiProjects.length > 0) {
-					rmCloser.notifyEvaluate(uniqueWikiProjects);
+					rmCloser.notifyGetSection(uniqueWikiProjects);
 				}
 			});
 		}
 	}
 };
 
-rmCloser.notifyEvaluate = function(wikiProjectsToNotify) {
+rmCloser.notifyGetSection = function(wikiProjectsToNotify) {
+	var title_obj = mw.Title.newFromText(Morebits.pageNameNorm);
+	rmCloser.talktitle = title_obj.getTalkPage().toText();
+	var talkpage = new Morebits.wiki.page(rmCloser.talktitle, 'Getting section.');
+	
+	talkpage.load(function(talkpage) {
+		var text = talkpage.getPageText();
+		var line;
+		var templateIndex = -1;
+		var rmSection;
+		var textToFind = text.split('\n');
+		for (var i = 0; i < textToFind.length; i++) {	
+			line = textToFind[i];
+			if(/{{[Rr]equested move\/dated/.test(line)){
+				templateIndex = i;
+				break;
+			}
+		}
+
+		for (var i = templateIndex; i >= 0; i--) {
+			line = textToFind[i];
+			if (line.match(/^(==)[^=].+\1/)) {
+				rmSection = line.match(/^(==)[^=](.+)\1/)[2].trim();
+				break;
+			}
+		}
+
+		rmCloser.notifyEvaluate(wikiProjectsToNotify, rmSection);
+	});
+};
+
+rmCloser.notifyEvaluate = function(wikiProjectsToNotify, moveSection) {
 	var wikiProjectsNotified = [];
 	var wikiProjectCount = 0;
 	for (var j=0; j<wikiProjectsToNotify.length; j++) {
@@ -628,20 +671,6 @@ rmCloser.notifyEvaluate = function(wikiProjectsToNotify) {
 			var wikiProjectToNotify = talkpage.getPageName();
 			var text = talkpage.getPageText();
 	
-			var sections = document.getElementsByClassName("mw-headline");
-			var sectionArray = [];
-			for(var i=0; i<sections.length; i++){
-				sectionArray.push(sections[i].innerHTML);	
-			}
-			sectionArray.reverse();
-			var sectionToFind = /Requested move [0-9]{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4}/;
-			var moveSection;
-			for(var i=0; i<sectionArray.length; i++){
-				if(sectionToFind.test(sectionArray[i])){
-					moveSection = sectionArray[i].match(/Requested move [0-9]{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4}/)[0];
-					break;
-				}
-			}
 			rmCloser.talktitle = mw.Title.newFromText(Morebits.pageNameNorm).getTalkPage().toText();
 			var pageAndSection = rmCloser.talktitle + "#" + moveSection;
 			
@@ -677,10 +706,25 @@ rmCloser.notifyListOnTalkPage = function(wikiProjectsNotified) {
 	discussionPage.load(function(discussionPage) {
 		var discussionPageText = discussionPage.getPageText();
 		
-		var sectionList = discussionPageText.match(/^(==)[^=].+\1/gm);
-		var sectionToFindWikitext = /== Requested move.*==/;
-		sectionList.reverse();
-		if(sectionToFindWikitext.test(sectionList[0])){
+		var templateFound = false;
+		var line;
+		var nextSection = "";
+		var textToFind = discussionPageText.split('\n');
+		for (var i = 0; i < textToFind.length; i++) {	
+			line = textToFind[i];
+			if(templateFound == false){
+				if(/{{[Rr]equested move\/dated/.test(line)){
+					templateFound = true;
+				}
+			} else if(templateFound == true){
+				if (line.match(/^(==)[^=].+\1/)) {
+					nextSection = line.match(/^(==)[^=].+\1/)[0];
+					break;
+				}
+			}
+		}
+
+		if (nextSection.length == 0) {
 			if (wikiProjectsNotified.length == 1) {
 				var wikiProjectToNotify = wikiProjectsNotified[0];
 				discussionPageText+='\n:<small>Note: [[' + wikiProjectToNotify + '|' + wikiProjectToNotify.slice(15) + ']] has been notified of this discussion. ~~~~</small>';
@@ -701,33 +745,27 @@ rmCloser.notifyListOnTalkPage = function(wikiProjectsNotified) {
 				}
 				discussionPageText += ' have been notified of this discussion. ~~~~</small>';
 			}
-		} else{
-			var i;
-			for(i=0;i<sectionList.length;i++){
-				if(sectionToFindWikitext.test(sectionList[i])){
-					if (wikiProjectsNotified.length == 1) {
-						var wikiProjectToNotify = wikiProjectsNotified[0];
-						discussionPageText = discussionPageText.replace(sectionList[i-1], ':<small>Note: [[' + wikiProjectToNotify + '|' + wikiProjectToNotify.slice(15) + ']] has been notified of this discussion. ~~~~</small>\n\n' + sectionList[i-1]);
-					} else {
-						var textToInsert = '\n:<small>Note: ';
-						for (var j=0; j<wikiProjectsNotified.length; j++) {
-							var wikiProjectToNotify = wikiProjectsNotified[j];
-							textToInsert += '[[' + wikiProjectToNotify + '|' + wikiProjectToNotify.slice(15) + ']]';
-							if (j == wikiProjectsNotified.length-2) {
-								if (wikiProjectsNotified.length == 2) {
-									textToInsert += ' and ';
-								} else {
-									textToInsert += ', and ';
-								}
-							} else if (j != wikiProjectsNotified.length-1) {
-								textToInsert += ', ';
-							}
+		} else {
+			if (wikiProjectsNotified.length == 1) {
+				var wikiProjectToNotify = wikiProjectsNotified[0];
+				discussionPageText = discussionPageText.replace(nextSection, ':<small>Note: [[' + wikiProjectToNotify + '|' + wikiProjectToNotify.slice(15) + ']] has been notified of this discussion. ~~~~</small>\n\n' + nextSection);
+			} else {
+				var textToInsert = '\n:<small>Note: ';
+				for (var j=0; j<wikiProjectsNotified.length; j++) {
+					var wikiProjectToNotify = wikiProjectsNotified[j];
+					textToInsert += '[[' + wikiProjectToNotify + '|' + wikiProjectToNotify.slice(15) + ']]';
+					if (j == wikiProjectsNotified.length-2) {
+						if (wikiProjectsNotified.length == 2) {
+							textToInsert += ' and ';
+						} else {
+							textToInsert += ', and ';
 						}
-						textToInsert += ' have been notified of this discussion. ~~~~</small>\n\n';
-						discussionPageText = discussionPageText.replace(sectionList[i-1], textToInsert + sectionList[i-1]);
+					} else if (j != wikiProjectsNotified.length-1) {
+						textToInsert += ', ';
 					}
-					break;
 				}
+				textToInsert += ' have been notified of this discussion. ~~~~</small>\n\n';
+				discussionPageText = discussionPageText.replace(nextSection, textToInsert + nextSection);
 			}
 		}
 
