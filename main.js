@@ -150,7 +150,7 @@ rmCloser.evaluate = function(e) {
 		var templateIndex = -1;
 		var parsedDate;
 		var rmSection;
-		var nextSection = "";
+		var nextSection = false;
 		var textToFind = text.split('\n');
 		for (var i = 0; i < textToFind.length; i++) {	
 			line = textToFind[i];
@@ -161,6 +161,7 @@ rmCloser.evaluate = function(e) {
 				}
 			} else if(templateFound == true){
 				if (/ \(UTC\)/.test(line)){
+					line = line.substring(line.indexOf("This is a contested technical request"));
 					parsedDate = line.match(/, ([0-9]{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4}) \(UTC\)/)[1];
 					break;
 				} else if(/→/.test(line)){
@@ -180,7 +181,10 @@ rmCloser.evaluate = function(e) {
 		for (var i = templateIndex+1; i < textToFind.length; i++) {
 			line = textToFind[i];
 			if (line.match(/^(==)[^=].+\1/)) {
-				nextSection = line.match(/^(==)[^=].+\1/)[0];
+				nextSection = true;
+				var escapedLine = line.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')
+				var regex = new RegExp('(' + escapedLine + ')(?![\s\S]*(' + escapedLine + '))', 'm');
+				text = text.replace(regex, '{{subst:RM bottom}}\n\n' + line);
 				break;
 			}
 		}
@@ -195,10 +199,8 @@ rmCloser.evaluate = function(e) {
 		}
 		text = text.replace(/{{[Rr]equested move\/dated\|.*\n?[^\[]*}}/, "{{subst:RM top|'''" + result + ".'''" + closingComment + userGroupText +"}}");
 
-		if (nextSection.length == 0) {
+		if (!nextSection) {
 			text += '\n{{subst:RM bottom}}';
-		} else {
-			text = text.replace(nextSection, '{{subst:RM bottom}}\n\n' + nextSection);
 		}
 		
 		var multiMove = false;
@@ -507,19 +509,20 @@ rmCloser.relist = function rmCloserRelist(e) {
 		text = text.replace(sig, sig + " {{subst:RM relist}}");
 		
 		if(relistingComment != ''){
-			var nextSection = "";
+			var nextSection = false;
 			for (var i = templateIndex+1; i < textToFind.length; i++) {
 				line = textToFind[i];
 				if (line.match(/^(==)[^=].+\1/)) {
-					nextSection = line.match(/^(==)[^=].+\1/)[0];
+					nextSection = true;
+					var escapedLine = line.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')
+					var regex = new RegExp('(' + escapedLine + ')(?![\s\S]*(' + escapedLine + '))', 'm');
+					text = text.replace(regex, ':<small>\'\'\'Relisting comment\'\'\': ' + relistingComment + ' ~~~~</small>\n\n' + line);
 					break;
 				}
 			}
 
-			if (nextSection.length == 0) {
+			if (!nextSection) {
 				text += '\n:<small>\'\'\'Relisting comment\'\'\': ' + relistingComment + ' ~~~~</small>';
-			} else {
-				text = text.replace(nextSection, ':<small>\'\'\'Relisting comment\'\'\': ' + relistingComment + ' ~~~~</small>\n\n' + nextSection);
 			}
 		}
 		
@@ -708,7 +711,7 @@ rmCloser.notifyListOnTalkPage = function(wikiProjectsNotified) {
 		
 		var templateFound = false;
 		var line;
-		var nextSection = "";
+		var nextSection = false;
 		var textToFind = discussionPageText.split('\n');
 		for (var i = 0; i < textToFind.length; i++) {	
 			line = textToFind[i];
@@ -718,13 +721,36 @@ rmCloser.notifyListOnTalkPage = function(wikiProjectsNotified) {
 				}
 			} else if(templateFound == true){
 				if (line.match(/^(==)[^=].+\1/)) {
-					nextSection = line.match(/^(==)[^=].+\1/)[0];
+					nextSection = true;
+					var escapedLine = line.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')
+					var regex = new RegExp('(' + escapedLine + ')(?![\s\S]*(' + escapedLine + '))', 'm');
+					if (wikiProjectsNotified.length == 1) {
+						var wikiProjectToNotify = wikiProjectsNotified[0];
+						discussionPageText = discussionPageText.replace(regex, ':<small>Note: [[' + wikiProjectToNotify + '|' + wikiProjectToNotify.slice(15) + ']] has been notified of this discussion. ~~~~</small>\n\n' + line);
+					} else {
+						var textToInsert = ':<small>Note: ';
+						for (var j=0; j<wikiProjectsNotified.length; j++) {
+							var wikiProjectToNotify = wikiProjectsNotified[j];
+							textToInsert += '[[' + wikiProjectToNotify + '|' + wikiProjectToNotify.slice(15) + ']]';
+							if (j == wikiProjectsNotified.length-2) {
+								if (wikiProjectsNotified.length == 2) {
+									textToInsert += ' and ';
+								} else {
+									textToInsert += ', and ';
+								}
+							} else if (j != wikiProjectsNotified.length-1) {
+								textToInsert += ', ';
+							}
+						}
+						textToInsert += ' have been notified of this discussion. ~~~~</small>\n\n';
+						discussionPageText = discussionPageText.replace(regex, textToInsert + line);
+					}
 					break;
 				}
 			}
 		}
 
-		if (nextSection.length == 0) {
+		if (!nextSection) {
 			if (wikiProjectsNotified.length == 1) {
 				var wikiProjectToNotify = wikiProjectsNotified[0];
 				discussionPageText+='\n:<small>Note: [[' + wikiProjectToNotify + '|' + wikiProjectToNotify.slice(15) + ']] has been notified of this discussion. ~~~~</small>';
@@ -744,28 +770,6 @@ rmCloser.notifyListOnTalkPage = function(wikiProjectsNotified) {
 					}
 				}
 				discussionPageText += ' have been notified of this discussion. ~~~~</small>';
-			}
-		} else {
-			if (wikiProjectsNotified.length == 1) {
-				var wikiProjectToNotify = wikiProjectsNotified[0];
-				discussionPageText = discussionPageText.replace(nextSection, ':<small>Note: [[' + wikiProjectToNotify + '|' + wikiProjectToNotify.slice(15) + ']] has been notified of this discussion. ~~~~</small>\n\n' + nextSection);
-			} else {
-				var textToInsert = '\n:<small>Note: ';
-				for (var j=0; j<wikiProjectsNotified.length; j++) {
-					var wikiProjectToNotify = wikiProjectsNotified[j];
-					textToInsert += '[[' + wikiProjectToNotify + '|' + wikiProjectToNotify.slice(15) + ']]';
-					if (j == wikiProjectsNotified.length-2) {
-						if (wikiProjectsNotified.length == 2) {
-							textToInsert += ' and ';
-						} else {
-							textToInsert += ', and ';
-						}
-					} else if (j != wikiProjectsNotified.length-1) {
-						textToInsert += ', ';
-					}
-				}
-				textToInsert += ' have been notified of this discussion. ~~~~</small>\n\n';
-				discussionPageText = discussionPageText.replace(nextSection, textToInsert + nextSection);
 			}
 		}
 
