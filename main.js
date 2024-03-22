@@ -4,7 +4,7 @@ var rmCloser = {};
 window.rmCloser = rmCloser;
 
 $.when(
-	mw.loader.using([ 'mediawiki.api', 'ext.gadget.morebits' ]),
+	mw.loader.using([ 'mediawiki.api', 'ext.gadget.morebits', 'ext.gadget.libExtraUtil' ]),
 	$.ready
 ).then(function() {
 	if (document.getElementById("requestedmovetag") !== null && Morebits.pageNameNorm.indexOf("alk:") !== -1 && mw.config.get('wgCategories').includes('Requested moves') && !document.getElementById("wikiPreview") && mw.config.get('wgDiffOldId') == null) {
@@ -142,7 +142,17 @@ rmCloser.evaluate = function(e) {
 	var talkpage = new Morebits.wiki.page(rmCloser.talktitle, 'Closing move.');
 	talkpage.load(function(talkpage) {
 		var text = talkpage.getPageText();
-		var template = text.match(/{{[Rr]equested move\/dated\|.*\n?[^\[]*}}/)[0];
+		
+		var templatesOnPage = extraJs.parseTemplates(text,false);
+		var oldMovesPresent = [];
+		var template;
+		for (var i = 0; i < templatesOnPage.length; i++) {
+			if (templatesOnPage[i].name.toLowerCase() == "old moves" || templatesOnPage[i].name.toLowerCase() == "old move") {
+				oldMovesPresent.push(templatesOnPage[i]);
+			} else if (templatesOnPage[i].name.toLowerCase() == "requested move/dated") {
+				template = templatesOnPage[i];
+			}
+		}
 
 		var templateFound = false;
 		var numberOfMoves = 0;
@@ -205,28 +215,27 @@ rmCloser.evaluate = function(e) {
 		
 		var multiMove = false;
 		var moveSectionPlain = rmSection;
-		
-		var date = '|date=' + parsedDate;
+
+		var date = parsedDate;
 		var from = '';
-		if(result == "moved"){
-			from = '|from=' + rmCloser.title;
-		}
-		var destination = template.match(/\|new1=(.*)\|current2=/);
-		if(destination != null){
-			multiMove = true;
-			destination = destination[1];
-		} else{
-			destination = template.match(/\|(.*?)(?:\|.*)?}}/);
-			if(destination != null){
-				destination = destination[1];
+
+		var destination;
+		for (var i = 0; i < template.parameters.length; i++) {
+			if (template.parameters[i].name == "multiple") {
+				multiMove = true;
+			} else if (template.parameters[i].name == "new1") {
+				destination = template.parameters[i].value;
+				break;
+			} else if (template.parameters[i].name == "1") {
+				destination = template.parameters[i].value;
 			}
 		}
 		if(destination == "?"){
 			destination = "";
 		}
-		
-		var link = '|link=Special:Permalink/' + talkpage.getCurrentID() + '#' + moveSectionPlain;
-		
+
+		var link = 'Special:Permalink/' + talkpage.getCurrentID() + '#' + moveSectionPlain;
+
 		var archives = text.match(/{{[Aa]rchives/);
 		if(archives == null){
 			archives = text.match(/{{[Aa]rchive box/);
@@ -237,7 +246,100 @@ rmCloser.evaluate = function(e) {
 				}
 			}
 		}
-		text = text.replace(archives[0], '{{old move'+ date + from + '|destination=' + destination + '|result=' + result + link +'}}\n\n' + archives[0]);
+
+		if (oldMovesPresent.length == 0) {
+			if(result == "moved"){
+				from = '|from=' + rmCloser.title;
+			}
+			text = text.replace(archives[0], '{{old move'+ '|date=' + date + from + '|destination=' + destination + '|result=' + result + '|link=' + link +'}}\n\n' + archives[0]);
+		} else if (oldMovesPresent.length == 1) {
+			var isValidFormat = false;
+			var isListFormat = false;
+			var numOldMoves = 0;
+			for (var i = 0; i < oldMovesPresent[0].parameters.length; i++) {
+				var parameterName = oldMovesPresent[0].parameters[i].name;
+				parameterName = parameterName.toString();
+				if (parameterName == "list") {
+					isListFormat = true;
+					break;
+				} else if (parameterName == "result1") {
+					isValidFormat = true;
+					numOldMoves++;
+				} else if (parameterName.includes("result")) {
+					numOldMoves++;
+				}
+			}
+
+			if (isValidFormat && !isListFormat) {
+				var oldMovesText = oldMovesPresent[0].wikitext;
+				numOldMoves++;
+				if(result == "moved"){
+					from = '|from' + numOldMoves + '=' + rmCloser.title;
+				}
+				var newTextToAdd = '|date' + numOldMoves + '=' + date + from + '|destination' + numOldMoves + '=' + destination + '|result' + numOldMoves + '=' + result + '|link' + numOldMoves + '=' + link + '}}';
+				oldMovesText = oldMovesText.substring(0, oldMovesText.length-2) + newTextToAdd;
+				text = text.replace(oldMovesPresent[0].wikitext, oldMovesText);
+			} else if (isListFormat) {
+				if(result == "moved"){
+					from = '|from=' + rmCloser.title;
+				}
+				text = text.replace(archives[0], '{{old move'+ '|date=' + date + from + '|destination=' + destination + '|result=' + result + '|link=' + link +'}}\n\n' + archives[0]);
+			} else {
+				var oldMovesText = '{{' + oldMovesPresent[0].name;
+				for (var i = 0; i < oldMovesPresent[0].parameters.length; i++) {
+					if (oldMovesPresent[0].parameters[i].name == "date") {
+						oldMovesText += '|date1=' + oldMovesPresent[0].parameters[i].value;
+					} else if (oldMovesPresent[0].parameters[i].name == "from") {
+						oldMovesText += '|name1=' + oldMovesPresent[0].parameters[i].value;
+					} else if (oldMovesPresent[0].parameters[i].name == "destination") {
+						oldMovesText += '|destination1=' + oldMovesPresent[0].parameters[i].value;
+					} else if (oldMovesPresent[0].parameters[i].name == "result") {
+						oldMovesText += '|result1=' + oldMovesPresent[0].parameters[i].value;
+					} else if (oldMovesPresent[0].parameters[i].name == "link") {
+						oldMovesText += '|link1=' + oldMovesPresent[0].parameters[i].value;
+					} else {
+						oldMovesText += oldMovesPresent[0].parameters[i].wikitext;
+					}
+				}
+				if(result == "moved"){
+					from = '|from2=' + rmCloser.title;
+				}
+				var newTextToAdd = '|date2=' + date + from + '|destination2=' + destination + '|result2=' + result + '|link2=' + link + '}}';
+				oldMovesText += newTextToAdd;
+				text = text.replace(oldMovesPresent[0].wikitext, oldMovesText);
+			}
+			
+		} else {
+			var oldMovesText = '{{Old moves';
+			var numOldMoves = 1;
+			for (var i = 0; i < oldMovesPresent.length; i++) {
+				for (var j = 0; j < oldMovesPresent[i].parameters.length; j++) {
+					if (oldMovesPresent[i].parameters[j].name == "date") {
+						oldMovesText += '|date' + numOldMoves + '=' + oldMovesPresent[i].parameters[j].value;
+					} else if (oldMovesPresent[i].parameters[j].name == "from") {
+						oldMovesText += '|name' + numOldMoves + '=' + oldMovesPresent[i].parameters[j].value;
+					} else if (oldMovesPresent[i].parameters[j].name == "destination") {
+						oldMovesText += '|destination' + numOldMoves + '=' + oldMovesPresent[i].parameters[j].value;
+					} else if (oldMovesPresent[i].parameters[j].name == "result") {
+						oldMovesText += '|result' + numOldMoves + '=' + oldMovesPresent[i].parameters[j].value;
+					} else if (oldMovesPresent[i].parameters[j].name == "link") {
+						oldMovesText += '|link' + numOldMoves + '=' + oldMovesPresent[i].parameters[j].value;
+					} else {
+						oldMovesText += oldMovesPresent[i].parameters[j].wikitext;
+					}
+				}
+				numOldMoves++;
+			}
+			if(result == "moved"){
+				from = '|from' + numOldMoves + '=' + rmCloser.title;
+			}
+			var newTextToAdd = '|date' + numOldMoves + '=' + date + from + '|destination' + numOldMoves + '=' + destination + '|result' + numOldMoves + '=' + result + '|link' + numOldMoves + '=' + link + '}}';
+			oldMovesText += newTextToAdd;
+			text = text.replace(oldMovesPresent[0].wikitext, oldMovesText);
+			for (var i = 1; i < oldMovesPresent.length; i++) {
+				text = text.replace(oldMovesPresent[i].wikitext, "");
+			}
+		}
 	
 		talkpage.setPageText(text);
 		talkpage.setEditSummary('Closing requested move; ' + result + rmCloser.advert);
@@ -247,24 +349,20 @@ rmCloser.evaluate = function(e) {
 			var otherDestinations = [];
 			var otherPages = [];
 			for(i=2; i<(numberOfMoves+1); i++){
-				var text1 = "\\|current" + i + "=(.*)\\|new" + i;
-				var reg1 = new RegExp(text1);
-				var curr = template.match(reg1);
+				var curr;
 				var dest;
-				if(i != numberOfMoves){
-					var nextNum = i+1;
-					var text2 = "\\|new" + i + "=(.*)\\|current" + nextNum;
-					var reg2 = new RegExp(text2);
-					dest = template.match(reg2);
-				} else{
-					var text3 = "\\|new" + i + "=(.*)\\|}}";
-					var reg3 = new RegExp(text3);
-					dest = template.match(reg3);
+				for (var j = 0; j < template.parameters.length; j++) {
+					if (template.parameters[j].name == ("current" + i)) {
+						curr = template.parameters[j].value;
+					} else if (template.parameters[j].name == ("new" + i)) {
+						dest = template.parameters[j].value;
+						break;
+					}
 				}
 				
 				if(curr != null && dest != null){
-					otherPages.push(curr[1].trim());
-					otherDestinations.push(dest[1].trim());
+					otherPages.push(curr);
+					otherDestinations.push(dest);
 				}
 			}
 			
@@ -275,17 +373,23 @@ rmCloser.evaluate = function(e) {
 				var otherPage = new Morebits.wiki.page(rmCloser.otherTalktitle, 'Adding {{old move}} to ' + rmCloser.otherTalktitle + '.');
 				otherPage.load(function(otherPage) {
 					var otherText = otherPage.getPageText();
+
+					var templatesOnOtherPage = extraJs.parseTemplates(otherText,false);
+					var otherOldMovesPresent = [];
+					for (var i = 0; i < templatesOnOtherPage.length; i++) {
+						if (templatesOnOtherPage[i].name.toLowerCase() == "old moves" || templatesOnOtherPage[i].name.toLowerCase() == "old move") {
+							otherOldMovesPresent.push(templatesOnOtherPage[i]);
+						}
+					}
+					
 					var title = mw.Title.newFromText(otherPage.getPageName()).getSubjectPage().toText();
 					var OMcurr = otherPages[otherPages.indexOf(title)];
 					var OMdest = otherDestinations[otherPages.indexOf(title)];
 					var otherFrom = '';
-					if(result == "moved"){
-						otherFrom = '|from=' + OMcurr;
-					}
 					if(OMdest == "?"){
 						OMdest == "";
 					}
-					var otherDestination = '|destination=' + OMdest;
+					var otherDestination = OMdest;
 					var otherArchives = otherText.match(/{{[Aa]rchives/);
 					if(otherArchives == null){
 						otherArchives = otherText.match(/{{[Aa]rchive box/);
@@ -296,7 +400,100 @@ rmCloser.evaluate = function(e) {
 							}
 						}
 					}
-					otherText = otherText.replace(otherArchives[0], '{{old move'+ date + otherFrom + otherDestination + '|result=' + result + link +'}}\n\n' + otherArchives[0]);
+
+					if (otherOldMovesPresent.length == 0) {
+						if(result == "moved"){
+							otherFrom = '|from=' + OMcurr;
+						}
+						otherText = otherText.replace(otherArchives[0], '{{old move'+ '|date=' + date + otherFrom + '|destination=' + otherDestination + '|result=' + result + '|link=' + link +'}}\n\n' + otherArchives[0]);
+					} else if (otherOldMovesPresent.length == 1) {
+						var isValidFormat = false;
+						var isListFormat = false;
+						var numOldMoves = 0;
+						for (var i = 0; i < otherOldMovesPresent[0].parameters.length; i++) {
+							var parameterName = otherOldMovesPresent[0].parameters[i].name;
+							parameterName = parameterName.toString();
+							if (parameterName == "list") {
+								isListFormat = true;
+								break;
+							} else if (parameterName == "result1") {
+								isValidFormat = true;
+								numOldMoves++;
+							} else if (parameterName.includes("result")) {
+								numOldMoves++;
+							}
+						}
+			
+						if (isValidFormat && !isListFormat) {
+							var oldMovesText = otherOldMovesPresent[0].wikitext;
+							numOldMoves++;
+							if(result == "moved"){
+								otherFrom = '|from' + numOldMoves + '=' + OMcurr;
+							}
+							var newTextToAdd = '|date' + numOldMoves + '=' + date + otherFrom + '|destination' + numOldMoves + '=' + otherDestination + '|result' + numOldMoves + '=' + result + '|link' + numOldMoves + '=' + link + '}}';
+							oldMovesText = oldMovesText.substring(0, oldMovesText.length-2) + newTextToAdd;
+							otherText = otherText.replace(otherOldMovesPresent[0].wikitext, oldMovesText);
+						} else if (isListFormat) {
+							if(result == "moved"){
+								otherFrom = '|from=' + OMcurr;
+							}
+							otherText = otherText.replace(otherArchives[0], '{{old move'+ '|date=' + date + otherFrom + '|destination=' + otherDestination + '|result=' + result + '|link=' + link +'}}\n\n' + otherArchives[0]);
+						} else {
+							var oldMovesText = '{{' + otherOldMovesPresent[0].name;
+							for (var i = 0; i < otherOldMovesPresent[0].parameters.length; i++) {
+								if (otherOldMovesPresent[0].parameters[i].name == "date") {
+									oldMovesText += '|date1=' + otherOldMovesPresent[0].parameters[i].value;
+								} else if (otherOldMovesPresent[0].parameters[i].name == "from") {
+									oldMovesText += '|name1=' + otherOldMovesPresent[0].parameters[i].value;
+								} else if (otherOldMovesPresent[0].parameters[i].name == "destination") {
+									oldMovesText += '|destination1=' + otherOldMovesPresent[0].parameters[i].value;
+								} else if (otherOldMovesPresent[0].parameters[i].name == "result") {
+									oldMovesText += '|result1=' + otherOldMovesPresent[0].parameters[i].value;
+								} else if (otherOldMovesPresent[0].parameters[i].name == "link") {
+									oldMovesText += '|link1=' + otherOldMovesPresent[0].parameters[i].value;
+								} else {
+									oldMovesText += otherOldMovesPresent[0].parameters[i].wikitext;
+								}
+							}
+							if(result == "moved"){
+								otherFrom = '|from2=' + OMcurr;
+							}
+							var newTextToAdd = '|date2=' + date + otherFrom + '|destination2=' + otherDestination + '|result2=' + result + '|link2=' + link + '}}';
+							oldMovesText += newTextToAdd;
+							otherText = otherText.replace(otherOldMovesPresent[0].wikitext, oldMovesText);
+						}
+						
+					} else {
+						var oldMovesText = '{{Old moves';
+						var numOldMoves = 1;
+						for (var i = 0; i < otherOldMovesPresent.length; i++) {
+							for (var j = 0; j < otherOldMovesPresent[i].parameters.length; j++) {
+								if (otherOldMovesPresent[i].parameters[j].name == "date") {
+									oldMovesText += '|date' + numOldMoves + '=' + otherOldMovesPresent[i].parameters[j].value;
+								} else if (otherOldMovesPresent[i].parameters[j].name == "from") {
+									oldMovesText += '|name' + numOldMoves + '=' + otherOldMovesPresent[i].parameters[j].value;
+								} else if (otherOldMovesPresent[i].parameters[j].name == "destination") {
+									oldMovesText += '|destination' + numOldMoves + '=' + otherOldMovesPresent[i].parameters[j].value;
+								} else if (otherOldMovesPresent[i].parameters[j].name == "result") {
+									oldMovesText += '|result' + numOldMoves + '=' + otherOldMovesPresent[i].parameters[j].value;
+								} else if (otherOldMovesPresent[i].parameters[j].name == "link") {
+									oldMovesText += '|link' + numOldMoves + '=' + otherOldMovesPresent[i].parameters[j].value;
+								} else {
+									oldMovesText += otherOldMovesPresent[i].parameters[j].wikitext;
+								}
+							}
+							numOldMoves++;
+						}
+						if(result == "moved"){
+							otherFrom = '|from' + numOldMoves + '=' + OMcurr;
+						}
+						var newTextToAdd = '|date' + numOldMoves + '=' + date + otherFrom + '|destination' + numOldMoves + '=' + otherDestination + '|result' + numOldMoves + '=' + result + '|link' + numOldMoves + '=' + link + '}}';
+						oldMovesText += newTextToAdd;
+						otherText = otherText.replace(otherOldMovesPresent[0].wikitext, oldMovesText);
+						for (var i = 1; i < otherOldMovesPresent.length; i++) {
+							otherText = otherText.replace(otherOldMovesPresent[i].wikitext, "");
+						}
+					}
 
 					otherPage.setPageText(otherText);
 					otherPage.setEditSummary('Closing requested move; ' + result + rmCloser.advert);
@@ -308,7 +505,7 @@ rmCloser.evaluate = function(e) {
 			if(result == "moved"){
 				var waitInterval = setInterval(function(){
 					if(pagesLeft == 0){
-						rmCloser.movePages(rmCloser.title,destination,otherPages,otherDestinations,moveSectionPlain);
+						rmCloser.movePages(rmCloser.title,destination,otherPages,otherDestinations,link);
 						clearInterval(waitInterval);
 					}
 				}, 500);
@@ -317,18 +514,18 @@ rmCloser.evaluate = function(e) {
 			}
 		} else if(result == "moved"){
 			var emptyArray = [];
-			rmCloser.movePages(rmCloser.title,destination,emptyArray,emptyArray,moveSectionPlain);
+			rmCloser.movePages(rmCloser.title,destination,emptyArray,emptyArray,link);
 		} else{
 			setTimeout(function(){ location.reload() }, 2000);	
 		}
 	});
 };
 
-rmCloser.movePages = function rmCloserMovePages(curr1,dest1,currList,destList,sectionTitle){
+rmCloser.movePages = function rmCloserMovePages(curr1,dest1,currList,destList,link){
 	var numberToRemove = currList.length+1;
 	
 	rmCloser.talktitle = mw.Title.newFromText(Morebits.pageNameNorm).getTalkPage().toText();
-	var pageAndSection = rmCloser.talktitle + "#" + sectionTitle;
+	var pageAndSection = link;
 	var moveSummary = 'Moved per [[' + pageAndSection + ']]';
 	var rmtrReason = 'Per [[' + pageAndSection + ']].';
 	
