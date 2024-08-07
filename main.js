@@ -754,10 +754,12 @@ rmCloser.notify = function rmCloserNotify(e) {
 				subprojectList = subprojectList.children;
 				for (var j=0; j<subprojectList.length; j++) {
 					var wikiProjectName = subprojectList[j].title;
-					var wikiProjectTalk = mw.Title.newFromText(subprojectList[j].title).getTalkPage().toText();
-					if (!wikiProjectNames.includes(wikiProjectName)) {
-						wikiProjectNames.push(wikiProjectName);
-						wikiProjects.push(wikiProjectTalk);
+					if (mw.Title.newFromText(wikiProjectName)) {
+						var wikiProjectTalk = mw.Title.newFromText(wikiProjectName).getTalkPage().toText();
+						if (!wikiProjectNames.includes(wikiProjectName)) {
+							wikiProjectNames.push(wikiProjectName);
+							wikiProjects.push(wikiProjectTalk);
+						}
 					}
 				}
 			}
